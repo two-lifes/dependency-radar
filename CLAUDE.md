@@ -87,3 +87,4 @@ Before declaring a task done, run: `pnpm lint && pnpm typecheck && pnpm test`.
 5. New logic comes with tests. Bug fixes come with a test reproducing the bug.
 6. When making an architectural choice (library, data model, caching, approach), add an entry to `docs/decisions.md`: context, options, choice, why.
 7. Explain non-obvious code in the summary after each task so the author can review and defend it.
+8. After any UI change, open the page with Playwright MCP, take screenshots in dark and light themes at 1440px and 390px, compare against `docs/screens.md` and `docs/wireframes.png`, and fix mismatches before finishing.

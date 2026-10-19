@@ -21,7 +21,7 @@
 ## Чеклист
 
 ### A. Основа
-- [ ] **1. Каркас.** Next.js App Router, TS strict, pnpm, ESLint + Prettier, Tailwind v4 + `theme.css` → `globals.css`, Geist, скрипт темы в `<head>` (по умолчанию System), Vitest + RTL, Playwright smoke, скрипты из CLAUDE.md, `.env.example`. *Видно:* пустая главная с токенами в обеих темах, smoke-e2e проходит.
+- [x] **1. Каркас.** Next.js App Router, TS strict, pnpm, ESLint + Prettier, Tailwind v4 + `theme.css` → `globals.css`, Geist, скрипт темы в `<head>` (по умолчанию System), Vitest + RTL, Playwright smoke, скрипты из CLAUDE.md, `.env.example`. *Видно:* пустая главная с токенами в обеих темах, smoke-e2e проходит.
 - [ ] **2. CI и деплой.** GitHub Actions (lint, typecheck, test, e2e), подключение Vercel (делает автор). Проверить лимит длительности функции и выбрать вариант запуска проверки (см. «Проверка»), записать в decisions. *Видно:* зелёный CI, превью-URL.
 - [ ] **3. UI-примитивы.** `src/components/ui`: Button (primary/secondary/ghost/destructive), Badge (отставание, критичность, статусы пакета, включая пунктирный «not checked»), Input, Textarea, Skeleton, Tabs, Tooltip, Popover, DropdownMenu, Dialog, Toast (Radix). 404 и error boundary (screens 5.16). *Тесты:* RTL на варианты и a11y-атрибуты. *Видно:* страница 404.
 
