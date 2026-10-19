@@ -4,13 +4,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { PackageStatus as CheckedStatus } from "@/server/analysis/package-status";
+import type { Severity } from "@/server/analysis/severity";
+import type { Lag as LagResult } from "@/server/analysis/version-lag";
 
-// Colors per style guide §3 / screens.md §6. The value unions are local until the
-// domain types land in src/server/analysis (plan task 5).
+// Colors per style guide §3 / screens.md §6.
 
-export type Lag = "current" | "patch" | "minor" | "major";
-export type Severity = "critical" | "high" | "moderate" | "low";
-export type PackageStatus = "active" | "stale" | "deprecated" | "unchecked";
+export type Lag = LagResult["kind"];
+export type { Severity };
+export type PackageStatus = CheckedStatus | "unchecked";
 
 const lagTone: Record<Lag, BadgeTone> = {
   current: "success",
