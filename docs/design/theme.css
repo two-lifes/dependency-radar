@@ -49,7 +49,7 @@
   --moderate-soft: #fff7ed;
   --neutral-badge: #525252;
   --neutral-badge-soft: #f5f5f5;
-  --destructive: #e7000b;
+  --destructive: var(--danger);
 
   /* charts */
   --chart-1: #324ae5;
@@ -100,7 +100,7 @@
   --moderate-soft: #2f1a08;
   --neutral-badge: #a3a3a3;
   --neutral-badge-soft: #262626;
-  --destructive: #ff6467;
+  --destructive: var(--danger);
 
   --chart-1: #5b6ff0;
   --chart-2: #00bc7d;

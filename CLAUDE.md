@@ -46,7 +46,7 @@ src/
     analysis/          pure logic: version diff, health score, breaking-change detection, upgrade plan
   lib/                 shared utils
 tests/e2e/             Playwright
-docs/                  spec.md, decisions.md
+docs/                  spec.md, decisions.md, workflow.md, plan.md
 ```
 
 Logic in `src/server/analysis` must be pure functions (no I/O) with unit tests.

@@ -1,6 +1,8 @@
 # Dependency Radar — экраны, маршруты и навигация (эталон)
 
-Версия 2.0 · 18.10.2026 · дополняет `docs/spec.md` v1.1.
+Цвета на вайрфреймах не финальные, цвета — только из style-guide.
+
+Версия 2.1 · 19.10.2026 · дополняет `docs/spec.md` v1.2.
 
 Этот документ — единственный источник правды о том, **какие экраны есть, по каким адресам они открываются, что на них расположено, куда ведёт каждое действие и как экран выглядит в каждом состоянии**. Визуально то же самое показано в `sitemap.excalidraw` (навигация) и `wireframes.excalidraw` (раскладка экранов). Если картинка и этот текст расходятся, прав текст.
 
@@ -48,7 +50,7 @@
 | `/invite/[token]` | Принятие приглашения в команду | все (гостя ведёт через вход) | 1.2 |
 | любой несуществующий | 404 | все | MVP |
 
-Параметры отчёта (обе вкладки, гостевой и сохранённый): `q` (поиск), `type` (`prod`, `dev`), `lag` (`major`, `minor`, `patch`, `current`; можно несколько), `vuln` (`any`, `critical`, `high`, `moderate`, `low`), `status` (`active`, `stale`, `deprecated`), `sort` (`name`, `lag`, `vulns`, `released`; префикс `-` означает убывание), `pkg` (открытая карточка пакета). Значения по умолчанию в URL не пишутся.
+Параметры отчёта (обе вкладки, гостевой и сохранённый): `q` (поиск), `type` (`prod`, `dev`), `lag` (`major`, `minor`, `patch`, `current`; можно несколько), `vuln` (`any`, `critical`, `high`, `moderate`, `low`), `status` (`active`, `stale`, `deprecated`, `unchecked`), `sort` (`name`, `lag`, `vulns`, `released`; префикс `-` означает убывание), `pkg` (открытая карточка пакета). Значения по умолчанию в URL не пишутся.
 
 ## 3. Граф переходов
 
@@ -165,7 +167,9 @@ flowchart LR
 - «Repository not found or private.»;
 - «No package.json in the repository root.»;
 - «GitHub is rate-limiting us. Try again in N minutes.»;
-- «File is too large (max 1 MB).»
+- «File is too large (max 1 MB).»;
+- «Too many checks. Try again in N minutes.»;
+- «Too many dependencies (max 300).»
 
 **Крайние случаи:** вставлен lock-файл вместо `package.json` → «This is a lockfile. Paste package.json instead (you can add the lockfile in Upload).»; монорепозиторий с workspaces → проверяется только корневой `package.json` с предупреждением «Workspaces aren't supported yet — checking root package.json only.»
 
@@ -209,7 +213,7 @@ flowchart LR
 | Первая загрузка | скелетоны шапки, сводки и 10 строк таблицы |
 | Идёт первая проверка | полоса прогресса; сводка в скелетонах; в таблице готовые строки, а для остальных — скелетон-строки с именем пакета |
 | Идёт повторная проверка | данные прошлой проверки видны, полоса прогресса сверху, обновлённые строки коротко подсвечиваются |
-| Проверка завершена частично | жёлтая плашка «12 packages couldn't be checked. [Show] [Retry failed]»; «Show» включает фильтр по непроверенным |
+| Проверка завершена частично | жёлтая плашка «12 packages couldn't be checked. [Show] [Retry failed]»; «Show» включает фильтр по непроверенным (`status=unchecked`) |
 | Проверка отменена | плашка «Check cancelled. Showing partial results. [Resume]» |
 | Проверка не удалась целиком | вместо содержимого: «We couldn't check this project.» + причина + «Try again» |
 | Гостевой отчёт истёк | «This report has expired.», «Guest reports are kept for 7 days.», кнопка «Run a new check» → `/` |
@@ -244,11 +248,12 @@ flowchart LR
 | Behind | бейдж «up to date» (зелёный) / «patch» (серый) / «minor» (жёлтый) / «major» (красный); если отставание на несколько мажоров — «2 majors» |
 | Vulnerabilities | число в цвете высшей критичности или «—» |
 | Released | дата последнего релиза относительно: «3 days ago» |
-| Status | «active» / «stale» (нет релизов больше 12 месяцев) / «deprecated» |
+| Status | «active» / «stale» (нет релизов больше 12 месяцев) / «deprecated» / «not checked» (с причиной в подсказке) |
 
 Сортировка кликом по заголовку колонки, повторный клик меняет направление (`aria-sort`). По умолчанию: сначала уязвимые, затем по отставанию по убыванию.
 
 **Выделение:** когда выделена хотя бы одна строка, вместо панели инструментов появляется панель действий: «3 selected» · [1.1] «Add to plan» · [1.1] «Snooze» · «Copy update command» · «Clear selection».
+Рядом с «Copy update command» — переключатель «npm / pnpm / yarn» (выбор по умолчанию и запоминание — ТЗ 7.5).
 
 **Клик по строке** (или Enter на строке в фокусе) открывает карточку пакета (5.9). Строка открытого пакета подсвечена.
 
@@ -296,10 +301,10 @@ flowchart LR
 2. Описание пакета (2 строки и «Show more»), лицензия.
 3. Версии: «Current 4.17.15 · Latest 4.17.21»; под ними шкала релизов от текущей версии до последней (точки; мажорные крупнее, возможно ломающие — красные).
 4. Вкладки панели: «Vulnerabilities (2)» | «Release notes» (по умолчанию открыта первая непустая).
-   - Vulnerabilities: как элемент из 5.6, но с полным описанием.
+   - Vulnerabilities: как элемент из 5.6, но с полным описанием. Одна запись на уязвимость со всеми её идентификаторами (GHSA, CVE), каждый — ссылкой на источник (ТЗ 7.3).
    - Release notes: версии от новых к старым, каждая свёрнута; версии с признаками ломающих изменений помечены «Possibly breaking» с подсказкой «Detected automatically from release notes». Если release notes нет: «No release notes published. [Open repository]».
 5. Нижняя прилипающая панель действий:
-   - [MVP] «Copy update command»;
+   - [MVP] «Copy update command» с переключателем «npm / pnpm / yarn» рядом (ТЗ 7.5);
    - [1.1] «Add to plan», «Snooze…» (поповер: «Until date» / «Until next major», поле комментария, кнопка «Snooze»), «Ignore vulnerability…» (причина обязательна);
    - гость видит только «Copy update command» и подсказку «Save project to snooze or plan updates».
 
@@ -370,7 +375,7 @@ flowchart LR
 
 ## 6. Сквозные правила интерфейса
 
-- **Цвета статусов** одинаковы везде: актуально — зелёный, patch — серый, minor — жёлтый, major — красный. Критичность: critical — тёмно-красный, high — красный, moderate — оранжевый, low — серый. Цвет никогда не единственный носитель смысла: рядом всегда текст или иконка.
+- **Цвета статусов** одинаковы везде: актуально — зелёный, patch — серый, minor — жёлтый, major — красный. Критичность: critical — тёмно-красный, high — красный, moderate — оранжевый, low — серый. Статус пакета: active — серый (`neutral-badge`), stale — жёлтый (`warning`), deprecated — красный (`danger`), not checked — серый с пунктирной рамкой. Цвет никогда не единственный носитель смысла: рядом всегда текст или иконка.
 - **Относительное время** («3 days ago») с полной датой во всплывающей подсказке.
 - **Версии** — моноширинным шрифтом.
 - **Внешние ссылки** открываются в новой вкладке, с иконкой «↗».
