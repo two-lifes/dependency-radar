@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# env (keep only the example)
+.env
+.env*.local
+!.env.example
+
+# vercel
+.vercel
+
+# tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# os / editors
+.DS_Store
+Thumbs.db
+*.pem
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# claude code: personal settings stay local, shared commands are committed
+.claude/settings.local.json
+CLAUDE.local.md
+
+# third-party screenshots used only as style references (not ours to publish)
+docs/design/references/*.png
