@@ -33,7 +33,7 @@
 ### C. Данные и источники
 - [x] **7. Схема БД.** Drizzle + Neon: `reports` (гостевой с `expiresAt` или привязанный к проекту), `checks`, `check_packages` (результат по пакету, статус, причина), `projects`, `api_cache`, `rate_limits`. Миграции. История проверок хранится уже в MVP, это задел для 1.1. Запись в decisions про модель данных. *Видно:* `pnpm db:migrate` проходит.
 - [x] **8. Кэш и npm-клиент.** `src/server/sources`: общий кэш в Postgres (ключ, TTL 1 ч), свой ограничитель параллельности, обработка 429/5xx. npm-клиент с Zod. *Тесты:* MSW.
-- [ ] **9. OSV и GitHub.** OSV `querybatch` + детали уязвимостей; GitHub: package.json и package-lock.json из публичного репо, releases; определение менеджера пакетов по spec 7.5: поле `packageManager` в package.json → наличие `pnpm-lock.yaml` / `yarn.lock` в репо (без разбора) → npm, rate limit → «Try again in N minutes». *Тесты:* MSW, в том числе 404, приватный репо, лимит.
+- [x] **9. OSV и GitHub.** OSV `querybatch` + детали уязвимостей; GitHub: package.json и package-lock.json из публичного репо, releases; определение менеджера пакетов по spec 7.5: поле `packageManager` в package.json → наличие `pnpm-lock.yaml` / `yarn.lock` в репо (без разбора) → npm, rate limit → «Try again in N minutes». *Тесты:* MSW, в том числе 404, приватный репо, лимит.
 - [ ] **10. Движок проверки + SSE.** Оркестратор: пакеты → источники → результат → запись в БД → событие; отмена, resume/retry failed, сбой пакета не валит отчёт. Route handler SSE (вариант по итогам задачи 2). *Тесты:* оркестратор на MSW, формат событий.
 
 ### D. Гостевой сценарий
