@@ -45,3 +45,6 @@ CLAUDE.local.md
 
 # third-party screenshots used only as style references (not ours to publish)
 docs/design/references/*.png
+
+# Personal links to web consoles
+docs/resources.md
