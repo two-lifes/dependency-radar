@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +77,31 @@ describe("Tabs", () => {
       expect(second).toHaveAttribute("aria-selected", "true"),
     );
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Notes panel");
+  });
+
+  // Chrome draws the keyboard focus ring for script focus, which Radix uses
+  // on mousedown; jsdom has no :focus-visible, so the call itself is checked.
+  it("focuses a clicked tab without the keyboard focus ring", () => {
+    const onMouseDown = vi.fn();
+    render(
+      <Tabs defaultValue="vulns">
+        <TabsList>
+          <TabsTrigger value="vulns">Vulnerabilities</TabsTrigger>
+          <TabsTrigger value="notes" onMouseDown={onMouseDown}>
+            Release notes
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+    const second = screen.getByRole("tab", { name: "Release notes" });
+    const focus = vi.spyOn(second, "focus");
+
+    fireEvent.mouseDown(second, { button: 0 });
+
+    expect(focus).toHaveBeenNthCalledWith(1, { focusVisible: false });
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute("aria-selected", "true");
+    expect(onMouseDown).toHaveBeenCalledOnce();
   });
 });
 

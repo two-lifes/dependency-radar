@@ -12,6 +12,13 @@ const openTab = (name: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0 });
 
 describe("CheckForm", () => {
+  it("keeps tab panels out of the Tab order", () => {
+    render(<CheckForm action={vi.fn()} />);
+
+    // Tab goes from the tab list straight to the field inside the panel.
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "-1");
+  });
+
   it("fills the paste field with the sample project", () => {
     render(<CheckForm action={vi.fn()} />);
     openTab("GitHub URL");

@@ -139,7 +139,9 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
           <TabsTrigger value="github">{copy.tabs.github}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="paste">
+        {/* Every panel holds a field, so the panel itself is no Tab stop
+            (WAI-ARIA tabs pattern); Radix makes it one by default. */}
+        <TabsContent value="paste" tabIndex={-1}>
           <Textarea
             ref={pasteRef}
             name="packageJson"
@@ -157,7 +159,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
           />
         </TabsContent>
 
-        <TabsContent value="upload">
+        <TabsContent value="upload" tabIndex={-1}>
           <Dropzone
             selection={upload}
             onFiles={(files) => void onFiles(files)}
@@ -172,7 +174,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
           />
         </TabsContent>
 
-        <TabsContent value="github" className="grid gap-2">
+        <TabsContent value="github" tabIndex={-1} className="grid gap-2">
           <Input
             ref={urlRef}
             name="url"
