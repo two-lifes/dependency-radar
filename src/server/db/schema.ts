@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { CheckFailureCode } from "../analysis/check-outcome";
 import type { Vulnerability } from "../analysis/merge-vulnerabilities";
 import type { LockedPackage } from "../analysis/parse-lockfile";
 import type {
@@ -106,8 +107,13 @@ export const checks = pgTable(
       .notNull()
       .references(() => reports.id, { onDelete: "cascade" }),
     status: checkStatus().notNull().default("running"),
-    failureReason: text("failure_reason"),
+    failureReason: text("failure_reason").$type<CheckFailureCode>(),
+    /** When a rate-limited source allows a retry, for "Try again in N minutes". */
+    retryAt: timestamptz("retry_at"),
     totalPackages: integer("total_packages").notNull(),
+    // The stream that runs the check holds and renews this lease; other
+    // streams only follow progress until it expires (runner died on timeout).
+    leaseUntil: timestamptz("lease_until"),
     startedAt: timestamptz("started_at").notNull().defaultNow(),
     finishedAt: timestamptz("finished_at"),
     // Snapshot taken when the check ends, for dashboard cards and history;
@@ -135,7 +141,6 @@ export const checkPackages = pgTable(
     type: dependencyType().notNull(),
     specifier: text().notNull(),
     checked: boolean().notNull(),
-    // Task 10 adds source failure reasons (rate limit, 5xx) to this union.
     reason: text().$type<UncheckedReason>(),
     registryName: text("registry_name"),
     current: text(),

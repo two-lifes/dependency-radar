@@ -9,7 +9,12 @@ export type UncheckedReason =
   | "invalid-specifier"
   | "no-matching-version"
   | "unknown-tag"
-  | "no-stable-version";
+  | "no-stable-version"
+  // Set by the check engine when a source fails for this package.
+  | "not-in-registry"
+  | "registry-rate-limited"
+  | "registry-unavailable"
+  | "vulnerabilities-unavailable";
 
 /** spec 7.3: the `latest` tag, never a prerelease. */
 export function resolveLatest(pkg: RegistryPackage): string | undefined {

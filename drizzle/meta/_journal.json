@@ -8,6 +8,13 @@
       "when": 1792434870836,
       "tag": "0000_parallel_loki",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792496341083,
+      "tag": "0001_thick_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }
