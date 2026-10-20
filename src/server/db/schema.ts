@@ -16,10 +16,8 @@ import {
 import type { CheckFailureCode } from "../analysis/check-outcome";
 import type { Vulnerability } from "../analysis/merge-vulnerabilities";
 import type { LockedPackage } from "../analysis/parse-lockfile";
-import type {
-  ManifestDependency,
-  ManifestWarning,
-} from "../analysis/parse-manifest";
+import type { ManifestDependency } from "../analysis/parse-manifest";
+import type { ReportWarning } from "../analysis/report-input";
 import type { UncheckedReason } from "../analysis/resolve-versions";
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
@@ -84,7 +82,7 @@ export const reports = pgTable(
     /** Lockfile entries by installed name; null when no lockfile was given. */
     lockedVersions:
       jsonb("locked_versions").$type<Record<string, LockedPackage>>(),
-    warnings: jsonb().$type<ManifestWarning[]>().notNull().default([]),
+    warnings: jsonb().$type<ReportWarning[]>().notNull().default([]),
     packageManager: packageManager("package_manager").notNull(),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
