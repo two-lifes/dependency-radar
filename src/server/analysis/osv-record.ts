@@ -1,6 +1,6 @@
 /**
  * The parts of an OSV vulnerability record the analysis needs. The Zod schema
- * for the API response lives with the OSV client (plan task 9).
+ * for the API response lives with the OSV client (`src/server/sources/osv.ts`).
  */
 export type OsvRecord = {
   id: string;

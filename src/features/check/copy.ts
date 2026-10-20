@@ -3,6 +3,10 @@ import type {
   ManifestError,
   ManifestWarning,
 } from "@/server/analysis/parse-manifest";
+import type { GithubSourceError } from "@/server/sources/github";
+
+/** A GitHub URL the landing couldn't parse, or a failed repository read. */
+export type GithubInputError = GithubSourceError | { code: "invalid-url" };
 
 const megabytes = (bytes: number) => bytes / (1024 * 1024);
 
@@ -43,4 +47,28 @@ export const lockfileWarningCopy: {
     `Lockfile is too large (max ${megabytes(maxBytes)} MB) — using version ranges instead.`,
   unsupported: () =>
     "Couldn't read package-lock.json (only v2/v3 supported) — using version ranges instead.",
+};
+
+const GITHUB_UNAVAILABLE = "Couldn't reach GitHub. Try again in a moment.";
+
+/** Without a hint GitHub asks to wait at least a minute (secondary limit). */
+function minutesUntilRetry(retryAfterSeconds = 60): string {
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+}
+
+// screens 5.1, "GitHub URL" source.
+export const githubErrorCopy: {
+  [K in GithubInputError["code"]]: (
+    error: Extract<GithubInputError, { code: K }>,
+  ) => string;
+} = {
+  "invalid-url": () =>
+    "Enter a repository URL like https://github.com/owner/repo.",
+  "not-found": () => "Repository not found or private.",
+  "no-package-json": () => "No package.json in the repository root.",
+  "rate-limited": ({ retryAfterSeconds }) =>
+    `GitHub is rate-limiting us. Try again in ${minutesUntilRetry(retryAfterSeconds)}.`,
+  unavailable: () => GITHUB_UNAVAILABLE,
+  "invalid-response": () => GITHUB_UNAVAILABLE,
 };

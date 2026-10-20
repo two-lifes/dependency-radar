@@ -53,20 +53,39 @@ export async function withCache<T, E>(
   load: () => Promise<Result<T, E>>,
   ttlMs: number = DEFAULT_TTL_MS,
 ): Promise<Result<T, E>> {
+  const cached = await readCache(cache, key, schema);
+  if (cached !== undefined) return { ok: true, value: cached };
+
+  const result = await load();
+  if (result.ok) await writeCache(cache, key, result.value, ttlMs);
+  return result;
+}
+
+/** A valid cached value, or `undefined` on a miss or a cache error. */
+export async function readCache<T>(
+  cache: Cache,
+  key: string,
+  schema: z.ZodType<T>,
+): Promise<T | undefined> {
   try {
     const parsed = schema.safeParse(await cache.get(key));
-    if (parsed.success) return { ok: true, value: parsed.data };
+    if (parsed.success) return parsed.data;
   } catch (error) {
     console.error(`[cache] read ${key} failed`, error);
   }
+  return undefined;
+}
 
-  const result = await load();
-  if (result.ok) {
-    try {
-      await cache.set(key, result.value, ttlMs);
-    } catch (error) {
-      console.error(`[cache] write ${key} failed`, error);
-    }
+/** Stores `value`; a cache error is logged and otherwise ignored. */
+export async function writeCache(
+  cache: Cache,
+  key: string,
+  value: unknown,
+  ttlMs: number = DEFAULT_TTL_MS,
+): Promise<void> {
+  try {
+    await cache.set(key, value, ttlMs);
+  } catch (error) {
+    console.error(`[cache] write ${key} failed`, error);
   }
-  return result;
 }
