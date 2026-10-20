@@ -6,7 +6,10 @@ test.describe("home page", () => {
     await page.goto("/");
     await expect(page).toHaveTitle("Dependency Radar");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Dependency Radar" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: "Know what's outdated, vulnerable and breaking — before you upgrade.",
+      }),
     ).toBeVisible();
   });
 
