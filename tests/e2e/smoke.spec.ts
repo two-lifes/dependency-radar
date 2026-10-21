@@ -35,6 +35,21 @@ test.describe("home page", () => {
       );
     });
 
+    // notFound() with a 404 status gets Next's error shell, where the <head>
+    // script doesn't run (ThemeScriptFallback). An invalid id needs no database.
+    test("keeps dark tokens on a report 404", async ({ page }) => {
+      const response = await page.goto("/r/not-a-report/dependencies");
+      expect(response?.status()).toBe(404);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Page not found" }),
+      ).toBeVisible();
+      await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+      await expect(page.locator("body")).toHaveCSS(
+        "background-color",
+        "rgb(10, 10, 10)",
+      );
+    });
+
     test("an explicit light preference wins", async ({ page }) => {
       await page.addInitScript(
         (key) => window.localStorage.setItem(key, "light"),

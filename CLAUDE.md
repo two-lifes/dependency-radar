@@ -77,6 +77,7 @@ Before declaring a task done, run: `pnpm lint && pnpm typecheck && pnpm test`.
 - Accessibility: semantic HTML, keyboard support, visible focus, labels for inputs, `prefers-reduced-motion`
 - UI text in English, kept in one place per feature so it can be translated later
 - Secrets only in env variables; `.env.example` lists every variable with no values
+- `notFound()` before streaming (real 404) makes Next send an error shell (`<html id="__next_error__">`) and render the root layout on the client, so inline `<head>` scripts don't run. Anything the theme script does must also be covered by `ThemeScriptFallback`; check 404s in both themes
 
 ## How to work in this repo
 
