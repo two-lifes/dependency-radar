@@ -1,4 +1,6 @@
-/** screens 5.6; the grouped list comes in task 16. */
+import { VulnerabilityList } from "@/features/report/vulnerability-list";
+
+/** screens 5.6 */
 export default function VulnerabilitiesPage() {
-  return null;
+  return <VulnerabilityList />;
 }

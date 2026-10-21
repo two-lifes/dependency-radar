@@ -32,6 +32,7 @@ import type { PackageRowJson } from "@/server/check/package-row";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
 import { DependencyCards } from "./dependency-cards";
 import { DependencyToolbar } from "./dependency-toolbar";
+import { EmptyState } from "./empty-state";
 import {
   filterRows,
   hasActiveFilters,
@@ -442,21 +443,6 @@ function TableView({
         </tbody>
       </table>
     </div>
-  );
-}
-
-function EmptyState({
-  icon,
-  children,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="grid justify-items-center gap-3 rounded-xl border border-border bg-card px-4 py-12 text-center [&>svg]:size-5">
-      {icon}
-      {children}
-    </section>
   );
 }
 

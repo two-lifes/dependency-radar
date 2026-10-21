@@ -178,6 +178,25 @@ export const reportCopy = {
       };
     },
   },
+  // screens 5.6
+  vulnerabilities: {
+    label: "Vulnerabilities by severity",
+    groups: {
+      critical: "Critical",
+      high: "High",
+      moderate: "Moderate",
+      low: "Low",
+    } satisfies Record<Severity, string>,
+    groupTitle: (title: string, count: number) => `${title} (${count})`,
+    sourceLabel: (id: string) => `${id} (opens in a new tab)`,
+    fixedIn: (version: string) => `Fixed in ${version}`,
+    noFix: "No fix available",
+    details: "Details",
+    detailsLabel: (name: string, id: string) => `Details: ${name}, ${id}`,
+    loading: "Looking for vulnerabilities…",
+    empty: "No known vulnerabilities in your dependencies.",
+    notChecked: "No packages have been checked yet.",
+  },
   empty: {
     noMatches: "No packages match these filters.",
     clearFilters: "Clear filters",
