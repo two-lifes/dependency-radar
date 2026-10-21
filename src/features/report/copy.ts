@@ -126,7 +126,9 @@ export const reportCopy = {
   selection: {
     label: "Selected packages",
     selected: (count: number) => `${count} selected`,
-    copyCommand: "Copy update command",
+    copyCommand: (count: number) => `Copy update command (${count})`,
+    copyCommandLabel: (count: number) =>
+      `Copy update command for ${plural(count, "selected package", "selected packages")}`,
     clear: "Clear selection",
     commandCopied: "Update command copied",
     copyFailed: "Couldn't copy the command.",

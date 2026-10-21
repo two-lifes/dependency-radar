@@ -20,6 +20,8 @@ import { FakeEventSource } from "./test/fake-event-source";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/components/ui/toast", () => ({ toast }));
 
 const result = (
   name: string,
@@ -488,7 +490,11 @@ describe("DependencyTable selection", () => {
   });
   afterEach(() => window.localStorage.clear());
 
-  const renderTable = (search = "", manager: "npm" | "pnpm" = "npm") =>
+  const renderTable = (
+    search = "",
+    manager: "npm" | "pnpm" = "npm",
+    list: PackageRowJson[] = rows,
+  ) =>
     render(
       <ReportProvider
         reportId="r1"
@@ -496,14 +502,14 @@ describe("DependencyTable selection", () => {
         packageManager={manager}
         checkId="c1"
         running={false}
-        totalPackages={rows.length}
-        dependencies={rows.map((row) => ({
+        totalPackages={list.length}
+        dependencies={list.map((row) => ({
           name: row.name,
           specifier: "^1.0.0",
           type: row.type,
         }))}
         previousRows={[]}
-        currentRows={rows}
+        currentRows={list}
       >
         <DependencyTable />
       </ReportProvider>,
@@ -547,7 +553,9 @@ describe("DependencyTable selection", () => {
     renderTable("", "pnpm");
     fireEvent.click(selectAll());
     fireEvent.click(
-      screen.getByRole("button", { name: "Copy update command" }),
+      screen.getByRole("button", {
+        name: "Copy update command for 3 selected packages",
+      }),
     );
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
@@ -566,7 +574,9 @@ describe("DependencyTable selection", () => {
 
     fireEvent.click(switcher.getByRole("radio", { name: "pnpm" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Copy update command" }),
+      screen.getByRole("button", {
+        name: "Copy update command for 3 selected packages",
+      }),
     );
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
@@ -578,6 +588,42 @@ describe("DependencyTable selection", () => {
     renderTable("", "npm");
     fireEvent.click(selectAll());
     expect(screen.getByRole("radio", { name: "pnpm" })).toBeChecked();
+  });
+
+  const upToDate = result("react", {
+    lagKind: "current",
+    latest: "1.0.0",
+    lagMajors: null,
+  });
+
+  it("counts only the selected packages the command updates", () => {
+    renderTable("", "npm", [...rows, upToDate]);
+    fireEvent.click(selectAll());
+    const bar = within(
+      screen.getByRole("group", { name: "Selected packages" }),
+    );
+    expect(bar.getByText("4 selected")).toBeInTheDocument();
+    expect(
+      bar.getByRole("button", {
+        name: "Copy update command for 3 selected packages",
+      }),
+    ).toHaveTextContent("Copy update command (3)");
+  });
+
+  it("shows (0) and explains when the selection is up to date", () => {
+    toast.mockReset();
+    renderTable("", "npm", [...rows, upToDate]);
+    fireEvent.click(table().getByRole("checkbox", { name: "Select react" }));
+    const button = screen.getByRole("button", {
+      name: "Copy update command for 0 selected packages",
+    });
+    expect(button).toHaveTextContent("Copy update command (0)");
+
+    fireEvent.click(button);
+    expect(toast).toHaveBeenCalledWith({
+      title: "Selected packages are already up to date.",
+    });
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it("copies the command for every shown package from the toolbar", async () => {

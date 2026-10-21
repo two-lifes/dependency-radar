@@ -8,7 +8,7 @@ import { copyUpdateCommand } from "./copy-command";
 import { PackageManagerSwitch } from "./package-manager-switch";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
-import { selectionCommand } from "./selection";
+import { selectionCommand, updateTargets } from "./selection";
 
 const copy = reportCopy.selection;
 
@@ -21,6 +21,8 @@ export function SelectionBar({
   onClear: () => void;
 }) {
   const { packageManager } = useReport();
+  // Can be below "N selected": up to date and unchecked rows are left out.
+  const updatable = updateTargets(rows).length;
 
   const onCopy = async () => {
     const command = selectionCommand(rows, packageManager);
@@ -40,9 +42,14 @@ export function SelectionBar({
       <p aria-live="polite" className="text-base font-medium tabular-nums">
         {copy.selected(rows.length)}
       </p>
-      <Button variant="secondary" size="sm" onClick={onCopy}>
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={copy.copyCommandLabel(updatable)}
+        onClick={onCopy}
+      >
         <Copy aria-hidden />
-        {copy.copyCommand}
+        {copy.copyCommand(updatable)}
       </Button>
       <PackageManagerSwitch />
       <Button variant="ghost" size="sm" onClick={onClear}>
