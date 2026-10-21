@@ -51,6 +51,7 @@ export async function ReportView({
         key={`${check?.id}:${check?.status}`}
         checkId={check?.id}
         running={running}
+        packageManager={report.packageManager}
         totalPackages={check?.totalPackages ?? report.dependencies.length}
         dependencies={report.dependencies}
         previousRows={previous?.rows.map(toPackageRowJson) ?? []}

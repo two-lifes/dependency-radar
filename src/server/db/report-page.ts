@@ -61,6 +61,7 @@ export type ReportPageData = {
     | "expiresAt"
     | "warnings"
     | "dependencies"
+    | "packageManager"
   >;
   check: (ReportCheck & { rows: CheckPackageRow[] }) | undefined;
   /** The check before a running one, whose results stay on screen. */
@@ -80,6 +81,7 @@ export async function getReportPage(
       expiresAt: reports.expiresAt,
       warnings: reports.warnings,
       dependencies: reports.dependencies,
+      packageManager: reports.packageManager,
     })
     .from(reports)
     .where(eq(reports.id, reportId))

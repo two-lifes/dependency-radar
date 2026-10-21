@@ -1,0 +1,63 @@
+import {
+  updateCommands,
+  type PackageManager,
+  type UpdateTarget,
+} from "@/server/analysis/update-command";
+import type { ReportRow } from "./report-rows";
+
+export type HeaderCheckState = boolean | "indeterminate";
+
+/**
+ * Rows hidden by a filter or the search leave the selection, so the count and
+ * the copied command always match what is on screen.
+ */
+export function pruneSelection(
+  selected: ReadonlySet<string>,
+  visible: readonly string[],
+): ReadonlySet<string> {
+  const kept = visible.filter((name) => selected.has(name));
+  return kept.length === selected.size ? selected : new Set(kept);
+}
+
+/** The header checkbox speaks for the filtered rows only (screens 5.5). */
+export function headerState(
+  selected: ReadonlySet<string>,
+  visible: readonly string[],
+): HeaderCheckState {
+  const count = visible.filter((name) => selected.has(name)).length;
+  if (count === 0) return false;
+  return count === visible.length ? true : "indeterminate";
+}
+
+/**
+ * spec 7.5 for the selection bar: one line, prod and dev commands joined with
+ * `&&` so a single paste runs both. Rows that are up to date, pending or not
+ * checked have nothing to update; null when no selected row does.
+ */
+export function selectionCommand(
+  rows: readonly ReportRow[],
+  manager: PackageManager,
+): string | null {
+  const targets = rows.flatMap((row): UpdateTarget[] => {
+    const result = row.result;
+    if (
+      !result?.checked ||
+      result.registryName === null ||
+      result.latest === null ||
+      result.lagKind === null ||
+      result.lagKind === "current"
+    ) {
+      return [];
+    }
+    return [
+      {
+        name: row.name,
+        registryName: result.registryName,
+        version: result.latest,
+        type: row.type,
+      },
+    ];
+  });
+  const commands = updateCommands(manager, targets);
+  return commands.length > 0 ? commands.join(" && ") : null;
+}

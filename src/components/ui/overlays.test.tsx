@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { Checkbox } from "./checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "./sheet";
 import { Skeleton } from "./skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import {
@@ -168,5 +170,49 @@ describe("Skeleton", () => {
     const { container } = render(<Skeleton className="h-4 w-24" />);
     expect(container.firstChild).toHaveAttribute("aria-hidden", "true");
     expect(container.firstChild).toHaveClass("animate-skeleton", "bg-muted");
+  });
+});
+
+describe("Sheet", () => {
+  it("is a labelled modal that closes on Escape and returns focus", async () => {
+    render(
+      <Sheet>
+        <SheetTrigger>Filters</SheetTrigger>
+        <SheetContent aria-describedby={undefined}>
+          <SheetTitle>Filter packages</SheetTitle>
+        </SheetContent>
+      </Sheet>,
+    );
+    const trigger = screen.getByRole("button", { name: "Filters" });
+    fireEvent.click(trigger);
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Filter packages",
+    });
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveFocus();
+  });
+});
+
+describe("Checkbox", () => {
+  it("toggles and reports a mixed state", () => {
+    const onCheckedChange = vi.fn();
+    const { rerender } = render(
+      <Checkbox
+        aria-label="Select react"
+        checked={false}
+        onCheckedChange={onCheckedChange}
+      />,
+    );
+    const box = screen.getByRole("checkbox", { name: "Select react" });
+    expect(box).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(box);
+    expect(onCheckedChange).toHaveBeenCalledWith(true);
+
+    rerender(<Checkbox aria-label="Select react" checked="indeterminate" />);
+    expect(box).toHaveAttribute("aria-checked", "mixed");
   });
 });

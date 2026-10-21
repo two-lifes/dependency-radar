@@ -7,6 +7,7 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown,
   ArrowUp,
@@ -15,9 +16,10 @@ import {
   CircleCheck,
   SearchX,
 } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { LagBadge, PackageStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -25,9 +27,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/cn";
-import { maxSeverity, type Severity } from "@/server/analysis/severity";
+import { maxSeverity } from "@/server/analysis/severity";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
+import { DependencyCards } from "./dependency-cards";
 import { DependencyToolbar } from "./dependency-toolbar";
 import {
   filterRows,
@@ -46,9 +49,19 @@ import {
   releasedAt,
   vulnerabilityRank,
 } from "./row-order";
+import {
+  headerState,
+  pruneSelection,
+  type HeaderCheckState,
+} from "./selection";
+import { SelectionBar } from "./selection-bar";
+import { severityText } from "./severity-text";
 import { useReportFilters } from "./use-report-filters";
 
 const copy = reportCopy.table;
+
+/** screens 5.5: from this many shown rows only the visible ones render. */
+export const VIRTUALIZE_FROM = 500;
 
 // Module scope: new features or columns on every render would rebuild the
 // row model.
@@ -138,6 +151,29 @@ export function DependencyTable({
   const ordered = useMemo(() => defaultOrder(rows), [rows]);
   const data = useMemo(() => filterRows(ordered, applied), [ordered, applied]);
   const sorting = useMemo(() => sortingFromUrl(filters.sort), [filters.sort]);
+  const names = useMemo(() => data.map((row) => row.name), [data]);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // Adjusting state while rendering (not in an effect) drops the rows a
+  // filter just hid before anything shows them as selected.
+  const visibleSelected = pruneSelection(selected, names);
+  if (visibleSelected !== selected) setSelected(visibleSelected);
+  const selection: Selection = {
+    has: (name) => visibleSelected.has(name),
+    header: headerState(visibleSelected, names),
+    toggle: (name, checked) =>
+      setSelected((current) => {
+        const next = new Set(current);
+        if (checked) next.add(name);
+        else next.delete(name);
+        return next;
+      }),
+    toggleAll: (checked) => setSelected(new Set(checked ? names : [])),
+  };
+  const selectedRows = data.filter((row) => visibleSelected.has(row.name));
+  const virtual = data.length >= VIRTUALIZE_FROM;
+
   const table = useTable({
     features,
     columns,
@@ -181,11 +217,21 @@ export function DependencyTable({
 
   return (
     <section className="grid gap-3">
-      <DependencyToolbar
-        state={filterState}
-        shown={data.length}
-        total={rows.length}
-      />
+      {/* screens 5.5: the toolbar (or the selection bar) sticks while scrolling. */}
+      <div className="sticky top-0 z-20 -mx-1 bg-background px-1 py-1">
+        {selectedRows.length > 0 ? (
+          <SelectionBar
+            rows={selectedRows}
+            onClear={() => setSelected(new Set())}
+          />
+        ) : (
+          <DependencyToolbar
+            state={filterState}
+            shown={data.length}
+            total={rows.length}
+          />
+        )}
+      </div>
       {data.length === 0 && filtering ? (
         <EmptyState
           icon={<SearchX aria-hidden className="text-muted-foreground" />}
@@ -196,81 +242,206 @@ export function DependencyTable({
           </Button>
         </EmptyState>
       ) : (
-        // relative: sr-only cells are absolute and would otherwise widen the page.
-        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-left text-base">
-            <caption className="sr-only">{copy.caption}</caption>
-            <thead className="bg-subtle">
-              {table.getHeaderGroups().map((group) => (
-                <tr key={group.id}>
-                  {group.headers.map((header) => {
-                    const canSort = header.column.getCanSort();
-                    const sorted = header.column.getIsSorted();
-                    return (
-                      <th
-                        key={header.id}
-                        scope="col"
-                        aria-sort={
-                          !canSort
-                            ? undefined
-                            : sorted === "asc"
-                              ? "ascending"
-                              : sorted === "desc"
-                                ? "descending"
-                                : "none"
-                        }
-                        className="h-9 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground"
-                      >
-                        {header.isPlaceholder ? null : canSort ? (
-                          <button
-                            type="button"
-                            onClick={header.column.getToggleSortingHandler()}
-                            className={cn(
-                              "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 hover:text-foreground",
-                              sorted && "text-foreground",
-                            )}
-                          >
-                            <table.FlexRender header={header} />
-                            <SortIcon sorted={sorted} />
-                          </button>
-                        ) : (
-                          <table.FlexRender header={header} />
-                        )}
-                      </th>
-                    );
-                  })}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => {
-                const { result, updatedAt } = row.original;
-                return (
-                  <tr
-                    // A new key replays the highlight when a result arrives.
-                    key={`${row.id}:${updatedAt ?? ""}`}
-                    aria-busy={result === null || undefined}
-                    className={cn(
-                      "h-10 border-t border-border",
-                      updatedAt !== undefined && "animate-row-flash",
-                    )}
-                  >
-                    {row.getAllCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="px-4 py-1.5 whitespace-nowrap"
-                      >
-                        <table.FlexRender cell={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="hidden md:block">
+            <TableView table={table} selection={selection} virtual={virtual} />
+          </div>
+          {/* screens 5.5: < 768px the table becomes a list of cards. */}
+          <div className="md:hidden">
+            <DependencyCards
+              rows={table.getRowModel().rows.map((row) => row.original)}
+              selection={selection}
+              virtual={virtual}
+            />
+          </div>
+        </>
       )}
     </section>
+  );
+}
+
+export type Selection = {
+  has: (name: string) => boolean;
+  header: HeaderCheckState;
+  toggle: (name: string, checked: boolean) => void;
+  toggleAll: (checked: boolean) => void;
+};
+
+type Table = ReturnType<typeof useTable<typeof features, ReportRow>>;
+
+/** Row height before measuring; rows with the `dev` line come out taller. */
+const ESTIMATED_ROW_HEIGHT = 41;
+
+function TableView({
+  table,
+  selection,
+  virtual,
+}: {
+  table: Table;
+  selection: Selection;
+  virtual: boolean;
+}) {
+  const rows = table.getRowModel().rows;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    getItemKey: (index) => rows[index]?.id ?? index,
+    overscan: 10,
+    enabled: virtual,
+  });
+  const items = virtual ? virtualizer.getVirtualItems() : null;
+  // Spacer rows keep a real <table> (column alignment, row semantics) while
+  // only the visible slice renders.
+  const padTop = items?.[0]?.start ?? 0;
+  const padBottom = items
+    ? virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0)
+    : 0;
+  const shown = items
+    ? items.flatMap((item) => {
+        const row = rows[item.index];
+        return row ? [{ row, index: item.index }] : [];
+      })
+    : rows.map((row, index) => ({ row, index }));
+  const columnCount = table.getAllLeafColumns().length + 1;
+
+  return (
+    // relative: sr-only cells are absolute and would otherwise widen the page.
+    <div
+      ref={scrollRef}
+      className={cn(
+        "relative overflow-x-auto rounded-xl border border-border bg-card",
+        // Its own scroll area, so the header can stick to it.
+        virtual && "max-h-160 overflow-y-auto",
+      )}
+    >
+      <table
+        className={cn(
+          "w-full text-left text-base",
+          // Fixed widths: otherwise columns resize as rows scroll in and out.
+          virtual && "min-w-240 table-fixed",
+        )}
+      >
+        <caption className="sr-only">{copy.caption}</caption>
+        {virtual ? (
+          <colgroup>
+            <col className="w-12" />
+            <col />
+            <col className="w-28" />
+            <col className="w-28" />
+            <col className="w-28" />
+            <col className="w-36" />
+            <col className="w-32" />
+            <col className="w-36" />
+          </colgroup>
+        ) : null}
+        <thead className={cn("bg-subtle", virtual && "sticky top-0 z-10")}>
+          {table.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              <th scope="col" className="h-9 w-12 pr-0 pl-4">
+                <Checkbox
+                  aria-label={copy.selectAll}
+                  checked={selection.header}
+                  onCheckedChange={(checked) =>
+                    selection.toggleAll(checked === true)
+                  }
+                  className="align-middle"
+                />
+              </th>
+              {group.headers.map((header) => {
+                const canSort = header.column.getCanSort();
+                const sorted = header.column.getIsSorted();
+                return (
+                  <th
+                    key={header.id}
+                    scope="col"
+                    aria-sort={
+                      !canSort
+                        ? undefined
+                        : sorted === "asc"
+                          ? "ascending"
+                          : sorted === "desc"
+                            ? "descending"
+                            : "none"
+                    }
+                    className="h-9 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground"
+                  >
+                    {header.isPlaceholder ? null : canSort ? (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className={cn(
+                          "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 hover:text-foreground",
+                          sorted && "text-foreground",
+                        )}
+                      >
+                        <table.FlexRender header={header} />
+                        <SortIcon sorted={sorted} />
+                      </button>
+                    ) : (
+                      <table.FlexRender header={header} />
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {padTop > 0 ? (
+            <tr aria-hidden="true">
+              <td colSpan={columnCount} style={{ height: padTop }} />
+            </tr>
+          ) : null}
+          {shown.map(({ row, index }) => {
+            const { result, updatedAt } = row.original;
+            const isSelected = selection.has(row.id);
+            return (
+              <tr
+                // A new key replays the highlight when a result arrives.
+                key={`${row.id}:${updatedAt ?? ""}`}
+                ref={virtual ? virtualizer.measureElement : undefined}
+                data-index={index}
+                aria-busy={result === null || undefined}
+                className={cn(
+                  "h-10 border-t border-border",
+                  isSelected && "bg-accent",
+                  updatedAt !== undefined && "animate-row-flash",
+                )}
+              >
+                <td className="py-1.5 pr-0 pl-4">
+                  <Checkbox
+                    aria-label={copy.select(row.id)}
+                    checked={isSelected}
+                    onCheckedChange={(checked) =>
+                      selection.toggle(row.id, checked === true)
+                    }
+                    className="align-middle"
+                  />
+                </td>
+                {row.getAllCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className={cn(
+                      "px-4 py-1.5 whitespace-nowrap",
+                      virtual && "truncate",
+                    )}
+                  >
+                    <table.FlexRender cell={cell} />
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+          {padBottom > 0 ? (
+            <tr aria-hidden="true">
+              <td colSpan={columnCount} style={{ height: padBottom }} />
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -394,13 +565,6 @@ function BehindCell({ row }: { row: ReportRow }) {
     />
   );
 }
-
-const severityText: Record<Severity, string> = {
-  critical: "text-critical",
-  high: "text-danger",
-  moderate: "text-moderate",
-  low: "text-muted-foreground",
-};
 
 function VulnerabilitiesCell({ row }: { row: ReportRow }) {
   return (

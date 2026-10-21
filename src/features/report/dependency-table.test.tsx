@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PackageRowJson } from "@/server/check/package-row";
-import { DependencyTable } from "./dependency-table";
+import { DependencyTable, VIRTUALIZE_FROM } from "./dependency-table";
 import { ReportProvider } from "./report-context";
 import { FakeEventSource } from "./test/fake-event-source";
 
@@ -58,8 +58,9 @@ const withUrl = (search = "", onUrlUpdate?: (event: UrlUpdateEvent) => void) =>
     );
   };
 
+// The cards list (< 768px) renders the same names; CSS hides one of the two.
 const rowOf = (name: string) => {
-  const cell = screen.getByText(name);
+  const cell = within(screen.getByRole("table")).getByText(name);
   const row = cell.closest("tr");
   if (!row) throw new Error(`no row for ${name}`);
   return row;
@@ -75,6 +76,7 @@ describe("DependencyTable", () => {
   it("turns skeleton rows into results as they stream in", async () => {
     render(
       <ReportProvider
+        packageManager="npm"
         checkId="c1"
         running
         totalPackages={2}
@@ -155,6 +157,7 @@ describe("DependencyTable columns and sorting", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <ReportProvider
+          packageManager="npm"
           checkId="c1"
           running={false}
           totalPackages={rows.length + 1}
@@ -189,6 +192,8 @@ describe("DependencyTable columns and sorting", () => {
     expect(
       screen.getAllByRole("columnheader").map((th) => th.textContent),
     ).toEqual([
+      // The selection column: a checkbox, no text.
+      "",
       "Package",
       "Current",
       "Latest",
@@ -316,6 +321,7 @@ describe("DependencyTable filters in the URL", () => {
   ) =>
     render(
       <ReportProvider
+        packageManager="npm"
         checkId="c1"
         running={false}
         totalPackages={rows.length}
@@ -431,6 +437,7 @@ describe("DependencyTable filters in the URL", () => {
       result(name, { lagKind: "current", latest: "1.0.0", lagMajors: null });
     render(
       <ReportProvider
+        packageManager="npm"
         checkId="c1"
         running={false}
         totalPackages={2}
@@ -449,5 +456,203 @@ describe("DependencyTable filters in the URL", () => {
       screen.getByText("Save project to get notified about new releases."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+});
+
+describe("DependencyTable selection", () => {
+  const rows: PackageRowJson[] = [
+    result("zod", { lagKind: "patch", latest: "1.0.1", lagMajors: null }),
+    result("next", { lagKind: "major", lagMajors: 2, latest: "3.0.0" }),
+    result("vitest", { type: "dev", lagKind: "minor", latest: "1.2.0" }),
+  ];
+  const writeText = vi.fn<(text: string) => Promise<void>>();
+
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+  });
+
+  const renderTable = (search = "", manager: "npm" | "pnpm" = "npm") =>
+    render(
+      <ReportProvider
+        packageManager={manager}
+        checkId="c1"
+        running={false}
+        totalPackages={rows.length}
+        dependencies={rows.map((row) => ({
+          name: row.name,
+          specifier: "^1.0.0",
+          type: row.type,
+        }))}
+        previousRows={[]}
+        currentRows={rows}
+      >
+        <DependencyTable />
+      </ReportProvider>,
+      { wrapper: withUrl(search) },
+    );
+  const table = () => within(screen.getByRole("table"));
+  const selectAll = () =>
+    table().getByRole("checkbox", { name: "Select all shown packages" });
+
+  it("swaps the toolbar for the selection bar and back", () => {
+    renderTable();
+    fireEvent.click(table().getByRole("checkbox", { name: "Select next" }));
+
+    const bar = within(
+      screen.getByRole("group", { name: "Selected packages" }),
+    );
+    expect(bar.getByText("1 selected")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Filter packages" }),
+    ).not.toBeInTheDocument();
+    expect(selectAll()).toHaveAttribute("aria-checked", "mixed");
+
+    fireEvent.click(bar.getByRole("button", { name: "Clear selection" }));
+    expect(
+      screen.getByRole("group", { name: "Filter packages" }),
+    ).toBeInTheDocument();
+    expect(selectAll()).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("selects every filtered row from the header", () => {
+    renderTable("?type=prod");
+    fireEvent.click(selectAll());
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(selectAll()).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(selectAll());
+    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+  });
+
+  it("copies one command with the dev packages after &&", async () => {
+    renderTable("", "pnpm");
+    fireEvent.click(selectAll());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy update command" }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        "pnpm add next@3.0.0 zod@1.0.1 && pnpm add -D vitest@1.2.0",
+      ),
+    );
+  });
+
+  it("selects from the mobile cards too", () => {
+    renderTable();
+    const cards = within(screen.getByRole("list", { name: "Packages" }));
+    fireEvent.click(cards.getByRole("checkbox", { name: "Select zod" }));
+    expect(
+      table().getByRole("checkbox", { name: "Select zod" }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+describe("DependencyTable on small screens", () => {
+  const rows = [
+    result("zod", { lagKind: "patch", latest: "1.0.1", lagMajors: null }),
+    result("next", { lagKind: "major", lagMajors: 2, latest: "3.0.0" }),
+  ];
+
+  it("filters from the Filters sheet", async () => {
+    const onUrlUpdate = vi.fn();
+    render(
+      <ReportProvider
+        packageManager="npm"
+        checkId="c1"
+        running={false}
+        totalPackages={rows.length}
+        dependencies={rows.map((row) => ({
+          name: row.name,
+          specifier: "^1.0.0",
+          type: "prod" as const,
+        }))}
+        previousRows={[]}
+        currentRows={rows}
+      >
+        <DependencyTable />
+      </ReportProvider>,
+      { wrapper: withUrl("", onUrlUpdate) },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const sheet = within(
+      await screen.findByRole("dialog", { name: "Filters" }),
+    );
+    fireEvent.click(
+      within(sheet.getByRole("group", { name: "Behind" })).getByRole("radio", {
+        name: "patch",
+      }),
+    );
+
+    fireEvent.keyDown(sheet.getByRole("radio", { name: "patch" }), {
+      key: "Escape",
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+
+    const cards = within(screen.getByRole("list", { name: "Packages" }));
+    expect(cards.getAllByRole("listitem")).toHaveLength(1);
+    expect(cards.getByText("zod")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        (onUrlUpdate.mock.lastCall?.[0] as UrlUpdateEvent | undefined)
+          ?.queryString,
+      ).toBe("?lag=patch"),
+    );
+    expect(
+      screen.getByRole("button", { name: "Filters (1)" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("DependencyTable with 500+ rows", () => {
+  const count = VIRTUALIZE_FROM + 100;
+  const names = Array.from(
+    { length: count },
+    (_, i) => `pkg-${String(i).padStart(4, "0")}`,
+  );
+
+  beforeEach(() => {
+    // jsdom has no layout: give the scroll area a height to fill.
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(640);
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1024);
+    // Measured rows (offsetHeight) would otherwise all be 0 px tall.
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(41);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("renders only the visible rows and keeps the header", () => {
+    render(
+      <ReportProvider
+        packageManager="npm"
+        checkId="c1"
+        running={false}
+        totalPackages={count}
+        dependencies={names.map((name) => ({
+          name,
+          specifier: "^1.0.0",
+          type: "prod" as const,
+        }))}
+        previousRows={[]}
+        currentRows={names.map((name) => result(name))}
+      >
+        <DependencyTable />
+      </ReportProvider>,
+      { wrapper: withUrl("?sort=name") },
+    );
+    const rendered = within(screen.getByRole("table")).getAllByRole("row");
+    // The header row plus a window of body rows.
+    expect(rendered.length).toBeGreaterThan(1);
+    expect(rendered.length).toBeLessThan(100);
+    expect(
+      screen.getByText(`Showing ${count} of ${count}`),
+    ).toBeInTheDocument();
+    expect(
+      within(rendered[1] ?? document.body).getByText("pkg-0000"),
+    ).toBeInTheDocument();
   });
 });

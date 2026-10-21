@@ -113,6 +113,22 @@ export const reportCopy = {
     noneLabel: "None",
     highestSeverity: (severity: Severity) => `, highest ${severity}`,
     pending: "Checking…",
+    selectAll: "Select all shown packages",
+    select: (name: string) => `Select ${name}`,
+    packages: "Packages",
+    to: "to",
+    vulnerabilityCount: (count: number) =>
+      count === 1 ? "1 vulnerability" : `${count} vulnerabilities`,
+  },
+  // screens 5.5: replaces the toolbar while rows are selected
+  selection: {
+    label: "Selected packages",
+    selected: (count: number) => `${count} selected`,
+    copyCommand: "Copy update command",
+    clear: "Clear selection",
+    commandCopied: "Update command copied",
+    copyFailed: "Couldn't copy the command.",
+    nothingToUpdate: "Selected packages are already up to date.",
   },
   // screens 5.5 toolbar and table states
   toolbar: {
@@ -121,6 +137,9 @@ export const reportCopy = {
     searchLabel: "Search packages",
     searchShortcut: "/",
     any: "Any",
+    filtersButton: "Filters",
+    filtersCount: (count: number) => `Filters (${count})`,
+    filtersTitle: "Filters",
     clearAll: "Clear all",
     removeFilter: (chip: string) => `Remove filter ${chip}`,
     showing: (shown: number, total: number) => `Showing ${shown} of ${total}`,

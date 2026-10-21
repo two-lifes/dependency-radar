@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, type ReactNode, use, useMemo } from "react";
 import type { ManifestDependency } from "@/server/analysis/parse-manifest";
+import type { PackageManager } from "@/server/analysis/update-command";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { buildRows, type ReportRow, type StreamState } from "./report-rows";
 import { useCheckStream } from "./use-check-stream";
@@ -10,6 +11,7 @@ import { useCheckStream } from "./use-check-stream";
 type ReportContextValue = {
   checkId: string | undefined;
   running: boolean;
+  packageManager: PackageManager;
   rows: ReportRow[];
   stream: StreamState;
   retryStream: () => void;
@@ -26,6 +28,7 @@ const ReportContext = createContext<ReportContextValue | null>(null);
 export function ReportProvider({
   checkId,
   running,
+  packageManager,
   totalPackages,
   dependencies,
   previousRows,
@@ -34,6 +37,7 @@ export function ReportProvider({
 }: {
   checkId: string | undefined;
   running: boolean;
+  packageManager: PackageManager;
   totalPackages: number;
   dependencies: ManifestDependency[];
   previousRows: PackageRowJson[];
@@ -70,6 +74,7 @@ export function ReportProvider({
       value={{
         checkId,
         running,
+        packageManager,
         rows,
         stream: state,
         retryStream: retry,

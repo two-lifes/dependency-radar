@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { reportCopy } from "./copy";
 import {
   FILTER_KEYS,
@@ -72,14 +78,22 @@ export function DependencyToolbar({
             </kbd>
           ) : null}
         </div>
-        {FILTER_KEYS.map((key) => (
-          <FilterMenu
-            key={key}
-            filter={key}
-            filters={filters}
-            setters={setters}
-          />
-        ))}
+        {/* screens 5.5: < 768px the menus move into the "Filters" sheet. */}
+        <div className="hidden items-center gap-2 md:flex">
+          {FILTER_KEYS.map((key) => (
+            <FilterMenu
+              key={key}
+              filter={key}
+              filters={filters}
+              setters={setters}
+            />
+          ))}
+        </div>
+        <FiltersSheet
+          filters={filters}
+          setters={setters}
+          active={active.length}
+        />
         <p
           aria-live="polite"
           className="ml-auto text-sm text-muted-foreground tabular-nums"
@@ -146,6 +160,86 @@ function FilterMenu<K extends FilterKey>({
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function FiltersSheet({
+  filters,
+  setters,
+  active,
+}: {
+  filters: Filters;
+  setters: { [P in FilterKey]: (value: Filters[P]) => void };
+  active: number;
+}) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="secondary" size="sm" className="md:hidden">
+          <SlidersHorizontal aria-hidden className="text-muted-foreground" />
+          {active > 0 ? copy.filtersCount(active) : copy.filtersButton}
+        </Button>
+      </SheetTrigger>
+      <SheetContent aria-describedby={undefined}>
+        <SheetTitle>{copy.filtersTitle}</SheetTitle>
+        {FILTER_KEYS.map((key) => (
+          <FilterRadios
+            key={key}
+            filter={key}
+            filters={filters}
+            setters={setters}
+          />
+        ))}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function FilterRadios<K extends FilterKey>({
+  filter,
+  filters,
+  setters,
+}: {
+  filter: K;
+  filters: Filters;
+  setters: { [P in FilterKey]: (value: Filters[P]) => void };
+}) {
+  const { label, values } = copy.filters[filter];
+  const labels: Record<string, string> = values;
+  const options = FILTER_VALUES[filter];
+  const current = filters[filter] ?? "";
+  const choices = [
+    { value: "", label: copy.any },
+    ...options.map((value) => ({ value, label: labels[value] ?? value })),
+  ];
+  return (
+    <fieldset className="grid gap-1">
+      <legend className="mb-1 text-sm font-medium text-muted-foreground">
+        {label}
+      </legend>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {choices.map((choice) => (
+          <label
+            key={choice.value}
+            className="flex min-h-9 items-center gap-2 text-base"
+          >
+            <input
+              type="radio"
+              name={`filter-${filter}`}
+              value={choice.value}
+              checked={current === choice.value}
+              onChange={() =>
+                setters[filter](
+                  options.find((value) => value === choice.value) ?? null,
+                )
+              }
+              className="size-4 accent-brand"
+            />
+            {choice.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
