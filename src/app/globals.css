@@ -191,6 +191,8 @@
   --animate-fade-in: fade-in 160ms var(--ease-out);
   --animate-pop-in: pop-in 160ms var(--ease-out);
   --animate-skeleton: skeleton 1.5s ease-in-out infinite;
+  /* style guide §7: an updated table row fades from brand-soft in 1.2 s */
+  --animate-row-flash: row-flash 1.2s var(--ease-out);
 
   @keyframes fade-in {
     from {
@@ -206,6 +208,11 @@
   @keyframes skeleton {
     50% {
       opacity: 0.5;
+    }
+  }
+  @keyframes row-flash {
+    from {
+      background-color: var(--brand-soft);
     }
   }
 }

@@ -52,7 +52,7 @@ export const lockfileWarningCopy: {
 const GITHUB_UNAVAILABLE = "Couldn't reach GitHub. Try again in a moment.";
 
 /** Without a hint GitHub asks to wait at least a minute (secondary limit). */
-function minutesUntilRetry(retryAfterSeconds = 60): string {
+export function minutesUntilRetry(retryAfterSeconds = 60): string {
   const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
   return minutes === 1 ? "1 minute" : `${minutes} minutes`;
 }
