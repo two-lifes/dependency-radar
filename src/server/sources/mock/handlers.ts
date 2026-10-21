@@ -120,6 +120,11 @@ const VULNERABILITIES: (OsvRecord & { package: string; fixed?: string })[] = [
   {
     id: "GHSA-mock-axio-0001",
     summary: "Mock: SSRF via absolute URLs",
+    // Real OSV details quote long URLs with no break opportunity (no spaces
+    // or hyphens); the package card must wrap them instead of scrolling
+    // sideways (e2e package-card).
+    details:
+      "Absolute URLs bypass baseURL. Fixed in https://github.com/axios/axios/commit/fb8eec214ce7744b5ca787f2c3b8339b2f54b00f",
     database_specific: { severity: "MODERATE" },
     package: "axios",
     fixed: "1.8.2",

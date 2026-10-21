@@ -33,6 +33,28 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    # A fresh database per run (plan.md assumption 1): report pages need one,
+    # and an empty api_cache means the mocks below are what the app sees.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: radar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway credentials of the service container above, not a secret.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/radar
+      # plan.md assumption 2: fake npm and OSV (src/server/sources/mock).
+      MOCK_EXTERNAL: "1"
+      MOCK_EXTERNAL_DELAY_MS: "200"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -43,6 +65,7 @@ jobs:
           cache: true
           require-lockfile: true
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
       - run: pnpm test:e2e
       - if: failure()
         uses: actions/upload-artifact@v7
