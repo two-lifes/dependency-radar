@@ -131,6 +131,17 @@ export const reportCopy = {
       `Copy update command for ${plural(count, "selected package", "selected packages")}`,
     clear: "Clear selection",
     commandCopied: "Update command copied",
+    // At most two names so the toast stays short; the rest is "and N more".
+    commandCopiedWithMajors: (names: readonly string[]) => {
+      const [first, second, ...rest] = names;
+      const list =
+        rest.length > 0
+          ? `${first}, ${second} and ${rest.length} more`
+          : second === undefined
+            ? first
+            : `${first} and ${second}`;
+      return `Update command copied. Includes ${plural(names.length, "major update", "major updates")}: ${list}. Check release notes before applying.`;
+    },
     copyFailed: "Couldn't copy the command.",
     nothingToUpdate: "Selected packages are already up to date.",
   },

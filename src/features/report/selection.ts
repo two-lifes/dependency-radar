@@ -56,6 +56,14 @@ export function updateTargets(rows: readonly ReportRow[]): UpdateTarget[] {
   });
 }
 
+/** Names of the rows the command moves across a major, in the command's order. */
+export function majorUpdates(rows: readonly ReportRow[]): string[] {
+  const targets = new Set(updateTargets(rows).map((target) => target.name));
+  return rows
+    .filter((row) => targets.has(row.name) && row.result?.lagKind === "major")
+    .map((row) => row.name);
+}
+
 /**
  * spec 7.5 for the selection bar and the toolbar: one line, prod and dev
  * commands joined with `&&` so a single paste runs both; null when no row

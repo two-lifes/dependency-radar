@@ -647,6 +647,63 @@ describe("DependencyTable selection", () => {
     );
   });
 
+  it("warns about major updates in the toast after copying", async () => {
+    toast.mockReset();
+    renderTable();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Copy update command for 3 shown packages",
+      }),
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({
+        title:
+          "Update command copied. Includes 1 major update: next. Check release notes before applying.",
+        description: "npm i next@3.0.0 zod@1.0.1 && npm i -D vitest@1.2.0",
+      }),
+    );
+  });
+
+  it("keeps the plain toast when the selection has no major updates", async () => {
+    toast.mockReset();
+    renderTable();
+    fireEvent.click(table().getByRole("checkbox", { name: "Select zod" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Copy update command for 1 selected package",
+      }),
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith({
+        title: "Update command copied",
+        description: "npm i zod@1.0.1",
+      }),
+    );
+  });
+
+  it("names two majors and counts the rest", async () => {
+    toast.mockReset();
+    renderTable("", "npm", [
+      result("react", { lagMajors: 3, latest: "4.0.0" }),
+      result("next", { lagMajors: 2, latest: "3.0.0" }),
+      result("vue", { lagMajors: 1, latest: "2.0.0" }),
+    ]);
+    fireEvent.click(selectAll());
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Copy update command for 3 selected packages",
+      }),
+    );
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title:
+            "Update command copied. Includes 3 major updates: react, next and 1 more. Check release notes before applying.",
+        }),
+      ),
+    );
+  });
+
   it("limits the toolbar command to the filtered rows", async () => {
     renderTable("?type=prod");
     fireEvent.click(

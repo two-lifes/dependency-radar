@@ -8,7 +8,7 @@ import { copyUpdateCommand } from "./copy-command";
 import { PackageManagerSwitch } from "./package-manager-switch";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
-import { selectionCommand, updateTargets } from "./selection";
+import { majorUpdates, selectionCommand, updateTargets } from "./selection";
 
 const copy = reportCopy.selection;
 
@@ -30,7 +30,7 @@ export function SelectionBar({
       toast({ title: copy.nothingToUpdate });
       return;
     }
-    await copyUpdateCommand(command);
+    await copyUpdateCommand(command, majorUpdates(rows));
   };
 
   return (

@@ -30,7 +30,7 @@ import {
 import { PackageManagerSwitch } from "./package-manager-switch";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
-import { selectionCommand, updateTargets } from "./selection";
+import { majorUpdates, selectionCommand, updateTargets } from "./selection";
 import type { ReportFilters } from "./use-report-filters";
 
 const copy = reportCopy.toolbar;
@@ -120,7 +120,9 @@ export function DependencyToolbar({
               aria-label={copy.copyCommandLabel(updatable)}
               onClick={() => {
                 const command = selectionCommand(shown, packageManager);
-                if (command !== null) void copyUpdateCommand(command);
+                if (command !== null) {
+                  void copyUpdateCommand(command, majorUpdates(shown));
+                }
               }}
             >
               <Copy aria-hidden />

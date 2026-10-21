@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { PackageRowJson } from "@/server/check/package-row";
 import type { ReportRow } from "./report-rows";
-import { headerState, pruneSelection, selectionCommand } from "./selection";
+import {
+  headerState,
+  majorUpdates,
+  pruneSelection,
+  selectionCommand,
+} from "./selection";
 
 const result = (overrides: Partial<PackageRowJson> = {}): PackageRowJson => ({
   checkId: "c1",
@@ -34,6 +39,22 @@ const row = (
     overrides === null
       ? null
       : result({ name, registryName: name, type, ...overrides }),
+});
+
+describe("majorUpdates", () => {
+  it("names only the rows the command moves across a major, in order", () => {
+    expect(
+      majorUpdates([
+        row("react"),
+        row("zod", { lagKind: "patch", latest: "1.0.1" }),
+        row("pending", null),
+        row("eslint", {}, "dev"),
+        row("next", { lagKind: "major", lagMajors: 2, latest: "3.0.0" }),
+        row("up", { lagKind: "current", latest: "1.0.0" }),
+        row("local", { checked: false, latest: null, lagKind: null }),
+      ]),
+    ).toEqual(["react", "eslint", "next"]);
+  });
 });
 
 describe("pruneSelection", () => {
