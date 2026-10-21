@@ -1,27 +1,34 @@
 import { render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { themeScript } from "@/lib/theme";
 import { ThemeScriptFallback } from "./theme-script-fallback";
 
-const themeScripts = () =>
-  [...document.head.querySelectorAll("script")].filter(
-    (script) => script.textContent === themeScript,
-  );
+// jsdom would run an inserted <script> in its own context, which has no
+// matchMedia and can't be stubbed from here, so the insert is intercepted.
+// The script itself is covered by theme.test.ts; the real page by e2e.
+let append: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  append = vi.spyOn(document.head, "append").mockImplementation(() => {});
+});
 
 afterEach(() => {
   document.documentElement.style.colorScheme = "";
-  themeScripts().forEach((script) => script.remove());
+  vi.restoreAllMocks();
 });
 
 describe("ThemeScriptFallback", () => {
   it("does nothing when the <head> script already ran", () => {
-    document.documentElement.style.colorScheme = "dark";
+    document.documentElement.style.colorScheme = "light";
     render(<ThemeScriptFallback />);
-    expect(themeScripts()).toHaveLength(0);
+    expect(append).not.toHaveBeenCalled();
   });
 
-  it("runs the theme script when the <head> one didn't", () => {
+  it("inserts the theme script when the <head> one didn't run", () => {
     render(<ThemeScriptFallback />);
-    expect(themeScripts()).toHaveLength(1);
+    expect(append).toHaveBeenCalledOnce();
+    const [script] = append.mock.calls[0] ?? [];
+    expect(script).toBeInstanceOf(HTMLScriptElement);
+    expect((script as HTMLScriptElement).textContent).toBe(themeScript);
   });
 });
