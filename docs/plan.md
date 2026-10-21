@@ -46,7 +46,7 @@
 - [x] **17. Карточка пакета.** `?pkg=` (Dialog справа 480px, на мобильных снизу на весь экран), focus trap, Esc с возвратом фокуса на строку, `j`/`k`, заголовок, описание, лицензия, ссылки, шкала релизов, вкладка уязвимостей (одна запись на уязвимость со всеми ID из задачи 6), «Copy update command», подсказка гостю, тост «Package not found in this project».
 - [x] **17.1. Подсказка про клавиши в карточке.** Строка «`j` `k` next / previous · `Esc` close» в нижней панели карточки на ≥ 768px; на мобильных скрыта (decisions 35). *Тесты:* RTL на подсказку без действий в панели.
 - [x] **18. Переключатель менеджера пакетов.** npm / pnpm / yarn рядом с каждой кнопкой копирования (панель выделения, карточка); по умолчанию менеджер из задачи 9 (spec 7.5); выбор в `localStorage` (с try/catch). *Тесты:* RTL на выбор по умолчанию и запоминание.
-- [ ] **19. Release notes в карточке.** Ленивая загрузка с GitHub через кэш, свёрнутые версии, «Possibly breaking» + подсказка, «No release notes published. [Open repository]», «Couldn't load release notes. Retry».
+- [x] **19. Release notes в карточке.** Ленивая загрузка с GitHub через кэш, свёрнутые версии, «Possibly breaking» + подсказка, «No release notes published. [Open repository]», «Couldn't load release notes. Retry».
 
 ### E. Аккаунт и проекты
 - [ ] **20. Авторизация.** Better Auth (сверить по Context7): GitHub OAuth + magic link через Resend (15 мин), `/login?next=`, `/login/check-email` (Resend с таймером 60 с), просроченная ссылка, защита маршрутов, шапка приложения с меню аватара (Settings, Theme, Sign out).
