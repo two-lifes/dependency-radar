@@ -234,6 +234,15 @@ describe("PackageCard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("names the j, k and Esc shortcuts even without a footer action", () => {
+    renderCard("?pkg=zod", { guest: false });
+    const card = within(dialog());
+    expect(card.getByText("j", { selector: "kbd" })).toBeInTheDocument();
+    expect(card.getByText("k", { selector: "kbd" })).toBeInTheDocument();
+    expect(card.getByText("Esc", { selector: "kbd" })).toBeInTheDocument();
+    expect(card.getByText("next / previous ·")).toBeInTheDocument();
+  });
+
   it("shows why a package wasn't checked and loads nothing for it", () => {
     renderCard("?pkg=local-lib");
     expect(

@@ -229,6 +229,11 @@ export const reportCopy = {
     commandCopied: "Update command copied",
     copyFailed: "Couldn't copy the command.",
     guestHint: "Save project to snooze or plan updates",
+    nextShortcut: "j",
+    previousShortcut: "k",
+    closeShortcut: "Esc",
+    nextPrevious: "next / previous",
+    close: "close",
   },
   empty: {
     noMatches: "No packages match these filters.",

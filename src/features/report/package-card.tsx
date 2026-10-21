@@ -139,6 +139,14 @@ function isTyping(target: EventTarget): boolean {
   );
 }
 
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="rounded-sm border border-border px-1.5 font-mono text-xs">
+      {children}
+    </kbd>
+  );
+}
+
 /**
  * The table row (or the mobile card, or a "Details" button) of a package.
  * Both the table and the cards render; CSS hides one, so pick the visible.
@@ -204,19 +212,30 @@ function PackagePanel({ row }: { row: ReportRow }) {
         ) : null}
       </div>
 
-      {command !== null || guest ? (
-        <footer className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 md:px-6">
-          {command !== null ? (
-            <Button variant="secondary" size="sm" onClick={onCopy}>
-              <Copy aria-hidden />
-              {copy.copyCommand}
-            </Button>
-          ) : null}
-          {guest ? (
-            <p className="text-sm text-muted-foreground">{copy.guestHint}</p>
-          ) : null}
-        </footer>
-      ) : null}
+      <footer
+        className={cn(
+          "flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 md:px-6",
+          // Only the shortcut hint is left, and phones have no keyboard.
+          command === null && !guest && "hidden md:flex",
+        )}
+      >
+        {command !== null ? (
+          <Button variant="secondary" size="sm" onClick={onCopy}>
+            <Copy aria-hidden />
+            {copy.copyCommand}
+          </Button>
+        ) : null}
+        {guest ? (
+          <p className="text-sm text-muted-foreground">{copy.guestHint}</p>
+        ) : null}
+        <p className="hidden w-full items-center gap-1 text-xs text-muted-foreground md:flex">
+          <Kbd>{copy.nextShortcut}</Kbd>
+          <Kbd>{copy.previousShortcut}</Kbd>
+          <span>{copy.nextPrevious} ·</span>
+          <Kbd>{copy.closeShortcut}</Kbd>
+          <span>{copy.close}</span>
+        </p>
+      </footer>
     </div>
   );
 }
