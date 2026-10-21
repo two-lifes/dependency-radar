@@ -356,7 +356,7 @@ function Description({ text }: { text: string }) {
       <p
         ref={measure}
         id="package-description"
-        className={cn("text-base break-words", !expanded && "line-clamp-2")}
+        className={cn("text-base wrap-anywhere", !expanded && "line-clamp-2")}
       >
         {text}
       </p>
@@ -473,9 +473,14 @@ function VulnerabilityItem({
           </a>
         ))}
       </div>
-      {summary ? <p className="text-sm font-medium">{summary}</p> : null}
+      {/* wrap-anywhere, not break-words: an unbroken URL in OSV text would
+          otherwise set the grid column's min-content width and scroll the
+          panel sideways. */}
+      {summary ? (
+        <p className="text-sm font-medium wrap-anywhere">{summary}</p>
+      ) : null}
       {details ? (
-        <p className="text-sm break-words whitespace-pre-line text-muted-foreground">
+        <p className="text-sm wrap-anywhere whitespace-pre-line text-muted-foreground">
           {details}
         </p>
       ) : null}
