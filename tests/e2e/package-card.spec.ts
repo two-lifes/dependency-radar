@@ -1,7 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 
-// Needs the database and MOCK_EXTERNAL=1 (fake npm and OSV): the sample
-// project's axios has an OSV record whose details quote a long unbroken URL.
+// Needs the database and MOCK_EXTERNAL=1 (fake npm, OSV and GitHub): the
+// sample project's axios has an OSV record and release notes that quote a
+// long unbroken URL.
 
 async function openSampleReport(page: Page) {
   await page.goto("/");
@@ -43,6 +44,15 @@ for (const viewport of [
     const card = page.getByRole("dialog");
     await expect(card.getByRole("heading", { name: "axios" })).toBeVisible();
     await expect(card.getByText(/axios\/commit\/[0-9a-f]{40}/)).toBeVisible();
+    expect(await horizontalOverflow(page)).toEqual([]);
+
+    // The mock release notes of axios end with an unbroken compare URL.
+    await card.getByRole("tab", { name: "Release notes" }).click();
+    await card
+      .getByRole("tabpanel", { name: "Release notes" })
+      .getByText("1.12.2", { exact: true })
+      .click();
+    await expect(card.getByText(/axios\/compare\/[0-9a-f]{40}/)).toBeVisible();
     expect(await horizontalOverflow(page)).toEqual([]);
   });
 }

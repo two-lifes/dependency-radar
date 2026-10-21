@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PackageDetails } from "@/server/check/package-details";
 import type { PackageRowJson } from "@/server/check/package-row";
+import type { ReleaseNotesView } from "@/server/check/release-notes";
 import { DependencyTable } from "./dependency-table";
 import { PackageCard } from "./package-card";
 import { ReportProvider } from "./report-context";
@@ -19,7 +20,8 @@ import { FakeEventSource } from "./test/fake-event-source";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const getPackageDetails = vi.hoisted(() => vi.fn());
-vi.mock("./package-actions", () => ({ getPackageDetails }));
+const getReleaseNotes = vi.hoisted(() => vi.fn());
+vi.mock("./package-actions", () => ({ getPackageDetails, getReleaseNotes }));
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/components/ui/toast", () => ({ toast }));
@@ -92,6 +94,20 @@ const details: PackageDetails = {
   ],
 };
 
+const releaseNotes: ReleaseNotesView = {
+  notes: [
+    {
+      version: "4.17.21",
+      title: null,
+      body: "## Bug Fixes\n- Fixed [prototype pollution](https://example.com/fix).",
+      url: "https://github.com/lodash/lodash/releases/tag/4.17.21",
+      publishedAt: "2021-02-20T00:00:00.000Z",
+      possiblyBreaking: false,
+    },
+  ],
+  repositoryUrl: "https://github.com/lodash/lodash",
+};
+
 function renderCard(
   search: string,
   {
@@ -134,6 +150,9 @@ function renderCard(
 }
 
 const dialog = () => screen.getByRole("dialog");
+// Radix tabs switch on mousedown, not click.
+const openTab = (name: string | RegExp) =>
+  fireEvent.mouseDown(within(dialog()).getByRole("tab", { name }));
 const tableRow = (name: string) => {
   const row = within(screen.getByRole("table")).getByText(name).closest("tr");
   if (!row) throw new Error(`no row for ${name}`);
@@ -152,6 +171,9 @@ describe("PackageCard", () => {
     getPackageDetails
       .mockReset()
       .mockResolvedValue({ ok: true, value: details });
+    getReleaseNotes
+      .mockReset()
+      .mockResolvedValue({ ok: true, value: releaseNotes });
     toast.mockReset();
     writeText.mockReset().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -188,7 +210,7 @@ describe("PackageCard", () => {
   it("lists each vulnerability once with all its IDs as links", () => {
     renderCard("?pkg=lodash");
     const section = within(
-      within(dialog()).getByRole("region", { name: "Vulnerabilities (1)" }),
+      within(dialog()).getByRole("tabpanel", { name: "Vulnerabilities (1)" }),
     );
     expect(
       section.getByRole("link", {
@@ -207,11 +229,133 @@ describe("PackageCard", () => {
     expect(section.getByText("Fixed in 4.17.21")).toBeInTheDocument();
   });
 
-  it("says when a package has no known vulnerabilities", () => {
+  it("says when a package has no known vulnerabilities", async () => {
     renderCard("?pkg=zod");
+    // Nothing to show there, so the card opens on the release notes.
     expect(
-      within(dialog()).getByText("No known vulnerabilities."),
+      within(dialog()).getByRole("tab", { name: "Release notes" }),
+    ).toHaveAttribute("aria-selected", "true");
+    openTab("Vulnerabilities (0)");
+    expect(
+      await within(dialog()).findByText("No known vulnerabilities."),
     ).toBeInTheDocument();
+  });
+
+  it("lists release notes collapsed, newest first, rendered from markdown", async () => {
+    renderCard("?pkg=lodash");
+    expect(
+      within(dialog()).getByRole("tab", { name: "Vulnerabilities (1)" }),
+    ).toHaveAttribute("aria-selected", "true");
+    openTab("Release notes");
+    const panel = within(
+      within(dialog()).getByRole("tabpanel", { name: "Release notes" }),
+    );
+    const version = await panel.findByText("4.17.21");
+    expect(version.closest("details")).not.toHaveAttribute("open");
+    expect(panel.queryByText("Possibly breaking")).not.toBeInTheDocument();
+    expect(
+      panel.getByRole("heading", { name: "Bug Fixes" }),
+    ).toBeInTheDocument();
+    expect(
+      panel.getByRole("link", { name: "prototype pollution" }),
+    ).toHaveAttribute("target", "_blank");
+    expect(panel.getByRole("link", { name: "View on GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/lodash/lodash/releases/tag/4.17.21",
+    );
+    expect(getReleaseNotes).toHaveBeenCalledWith("r1", "lodash");
+  });
+
+  it("marks possibly breaking releases in the list and on the scale", async () => {
+    getPackageDetails.mockResolvedValue({
+      ok: true,
+      value: {
+        ...details,
+        releases: [
+          { version: "1.1.0", publishedAt: null, position: 1, major: false },
+        ],
+      },
+    });
+    getReleaseNotes.mockResolvedValue({
+      ok: true,
+      value: {
+        notes: [
+          {
+            ...releaseNotes.notes[0],
+            version: "1.1.0",
+            body: "### Removed\n- `legacy()`",
+            possiblyBreaking: true,
+          },
+        ],
+        repositoryUrl: null,
+      },
+    });
+    renderCard("?pkg=zod");
+    const card = within(dialog());
+    expect(await card.findByText("Possibly breaking")).toBeInTheDocument();
+    expect(
+      card.getByText("Detected automatically from release notes"),
+    ).toBeInTheDocument();
+    expect(
+      card.getByText("1 release since current, 1 minor possibly breaking"),
+    ).toBeInTheDocument();
+  });
+
+  it("drops raw HTML and images from release notes", async () => {
+    getReleaseNotes.mockResolvedValue({
+      ok: true,
+      value: {
+        ...releaseNotes,
+        notes: [
+          {
+            ...releaseNotes.notes[0],
+            body: '<b onclick="x()">raw</b> text ![pixel](https://example.com/p.png)',
+          },
+        ],
+      },
+    });
+    renderCard("?pkg=zod");
+    const panel = within(
+      within(dialog()).getByRole("tabpanel", { name: "Release notes" }),
+    );
+    await panel.findByText("4.17.21");
+    // The tags go, their text stays as plain text.
+    expect(panel.getByText(/raw\s+text/)).toBeInTheDocument();
+    expect(
+      document.querySelector("[role=dialog] :is(b, img, [onclick])"),
+    ).toBeNull();
+  });
+
+  it("says when no release notes are published and links the repository", async () => {
+    getReleaseNotes.mockResolvedValue({
+      ok: true,
+      value: { notes: [], repositoryUrl: "https://github.com/colinhacks/zod" },
+    });
+    renderCard("?pkg=zod");
+    const card = within(dialog());
+    expect(
+      await card.findByText(/No release notes published\./),
+    ).toBeInTheDocument();
+    expect(card.getByRole("link", { name: "Open repository" })).toHaveAttribute(
+      "href",
+      "https://github.com/colinhacks/zod",
+    );
+  });
+
+  it("keeps the rest of the card when release notes fail, and retries", async () => {
+    getReleaseNotes.mockResolvedValueOnce({ ok: false, error: "unavailable" });
+    renderCard("?pkg=zod");
+    const card = within(dialog());
+    expect(
+      await card.findByText("Couldn't load release notes."),
+    ).toBeInTheDocument();
+    expect(card.getByText("Lodash modular utilities.")).toBeInTheDocument();
+
+    fireEvent.click(card.getByRole("button", { name: "Retry" }));
+    expect(
+      await card.findByText("4.17.21", { selector: "span" }),
+    ).toBeInTheDocument();
+    expect(getReleaseNotes).toHaveBeenCalledTimes(2);
   });
 
   it("copies the update command and shows the guest hint", async () => {
@@ -272,6 +416,7 @@ describe("PackageCard", () => {
       within(dialog()).getAllByText("Not from npm registry").length,
     ).toBeGreaterThan(0);
     expect(getPackageDetails).not.toHaveBeenCalled();
+    expect(getReleaseNotes).not.toHaveBeenCalled();
     expect(
       within(dialog()).queryByRole("button", { name: "Copy update command" }),
     ).not.toBeInTheDocument();
@@ -362,6 +507,9 @@ describe("DependencyTable rows open the package card", () => {
     getPackageDetails
       .mockReset()
       .mockResolvedValue({ ok: true, value: details });
+    getReleaseNotes
+      .mockReset()
+      .mockResolvedValue({ ok: true, value: releaseNotes });
   });
   afterEach(() => vi.unstubAllGlobals());
 

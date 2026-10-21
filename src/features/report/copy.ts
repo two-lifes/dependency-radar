@@ -217,15 +217,40 @@ export const reportCopy = {
     detailsFailed: "Couldn't load package details.",
     retry: "Retry",
     upToDate: "Up to date",
-    releases: (count: number, majors: number) =>
+    releases: (count: number, majors: number, flaggedMinors: number) =>
       `${plural(count, "release", "releases")} since current` +
-      (majors > 0 ? `, ${plural(majors, "major", "majors")}` : ""),
-    releasePoint: (version: string, date: string | null, major: boolean) =>
-      [version, date, major ? "major, possibly breaking" : null]
+      (majors > 0 ? `, ${plural(majors, "major", "majors")}` : "") +
+      (flaggedMinors > 0
+        ? `, ${plural(flaggedMinors, "minor", "minors")} possibly breaking`
+        : ""),
+    releasePoint: (
+      version: string,
+      date: string | null,
+      major: boolean,
+      possiblyBreaking: boolean,
+    ) =>
+      [
+        version,
+        date,
+        major
+          ? "major, possibly breaking"
+          : possiblyBreaking
+            ? "possibly breaking"
+            : null,
+      ]
         .filter(Boolean)
         .join(" · "),
     vulnerabilities: (count: number) => `Vulnerabilities (${count})`,
     noVulnerabilities: "No known vulnerabilities.",
+    releaseNotes: "Release notes",
+    loadingReleaseNotes: "Loading release notes…",
+    releaseNotesFailed: "Couldn't load release notes.",
+    noReleaseNotes: "No release notes published.",
+    openRepository: "Open repository",
+    emptyRelease: "This release has no description.",
+    viewOnGithub: "View on GitHub",
+    possiblyBreaking: "Possibly breaking",
+    possiblyBreakingHint: "Detected automatically from release notes",
     notChecked: "Not checked",
     copyCommand: "Copy update command",
     commandCopied: "Update command copied",

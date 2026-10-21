@@ -13,6 +13,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,6 +21,7 @@ import { PackageStatusBadge, SeverityBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 import {
   Tooltip,
@@ -29,18 +31,19 @@ import {
 import { cn } from "@/lib/cn";
 import type { Vulnerability } from "@/server/analysis/merge-vulnerabilities";
 import { npmPageUrl } from "@/server/analysis/package-links";
-import type { Result } from "@/server/analysis/result";
 import type { PackageDetails } from "@/server/check/package-details";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
 import { PackageManagerSwitch } from "./package-manager-switch";
 import { filterParsers } from "./filters";
-import { getPackageDetails, type PackageDetailsError } from "./package-actions";
+import { getPackageDetails, getReleaseNotes } from "./package-actions";
+import { ReleaseNotes, type ReleaseNotesState } from "./release-notes";
 import { ReleaseTimeline } from "./release-timeline";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
 import { orderedRows } from "./row-order";
 import { selectionCommand } from "./selection";
+import { type LoadState, useCheckedLoad } from "./use-checked-load";
 import { useOpenPackage } from "./use-open-package";
 import { vulnerabilitySourceUrl } from "./vulnerability-list";
 
@@ -49,7 +52,8 @@ const copy = reportCopy.card;
 /**
  * screens 5.9: the package card over the report, opened by `?pkg=`. What the
  * check stored (versions, vulnerabilities) shows at once; description,
- * license, links and the release scale load from npm's cached document.
+ * license, links and the release scale load from npm's cached document, the
+ * release notes from GitHub, each on its own.
  */
 export function PackageCard() {
   const { rows } = useReport();
@@ -164,7 +168,8 @@ function visiblePackageElement(name: string): HTMLElement | undefined {
 
 function PackagePanel({ row }: { row: ReportRow }) {
   const { reportId, guest, packageManager } = useReport();
-  const details = usePackageDetails(reportId, row);
+  const details = useCheckedLoad(getPackageDetails, reportId, row);
+  const notes = useCheckedLoad(getReleaseNotes, reportId, row);
   const { result } = row;
   const registryName = result?.checked ? result.registryName : null;
   const command = selectionCommand([row], packageManager);
@@ -205,9 +210,9 @@ function PackagePanel({ row }: { row: ReportRow }) {
 
       <div className="grid min-h-0 flex-1 content-start gap-6 overflow-y-auto p-4 md:p-6">
         <About details={details} />
-        <Versions row={row} details={details} />
+        <Versions row={row} details={details} notes={notes} />
         {result?.checked ? (
-          <Vulnerabilities vulnerabilities={result.vulnerabilities} />
+          <PackageTabs vulnerabilities={result.vulnerabilities} notes={notes} />
         ) : result === null ? (
           <SectionSkeleton />
         ) : null}
@@ -274,51 +279,7 @@ function IconLink({
   );
 }
 
-type DetailsState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "error"; retry: () => void }
-  | { status: "done"; value: PackageDetails };
-
-/**
- * Loads once the row has a checked result: a pending row (first check) has
- * no registry name yet, an unchecked one has nothing to load.
- */
-function usePackageDetails(reportId: string, row: ReportRow): DetailsState {
-  const { name, result } = row;
-  const key = result?.checked
-    ? [result.registryName, result.current, result.latest].join("|")
-    : null;
-  const [attempt, setAttempt] = useState(0);
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    attempt: number;
-    result: Result<PackageDetails, PackageDetailsError>;
-  } | null>(null);
-
-  useEffect(() => {
-    if (key === null) return;
-    let cancelled = false;
-    const settle = (outcome: Result<PackageDetails, PackageDetailsError>) => {
-      if (!cancelled) setLoaded({ key, attempt, result: outcome });
-    };
-    getPackageDetails(reportId, name).then(settle, () =>
-      // The action itself failed (network, server): same as a source failure.
-      settle({ ok: false, error: "unavailable" }),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [reportId, name, key, attempt]);
-
-  if (key === null) return { status: "idle" };
-  if (loaded?.key !== key || loaded.attempt !== attempt) {
-    return { status: "loading" };
-  }
-  return loaded.result.ok
-    ? { status: "done", value: loaded.result.value }
-    : { status: "error", retry: () => setAttempt((count) => count + 1) };
-}
+type DetailsState = LoadState<PackageDetails>;
 
 function About({ details }: { details: DetailsState }) {
   switch (details.status) {
@@ -398,8 +359,27 @@ function Description({ text }: { text: string }) {
   );
 }
 
-function Versions({ row, details }: { row: ReportRow; details: DetailsState }) {
+function Versions({
+  row,
+  details,
+  notes,
+}: {
+  row: ReportRow;
+  details: DetailsState;
+  notes: ReleaseNotesState;
+}) {
   const { result } = row;
+  const flagged = useMemo(
+    () =>
+      new Set(
+        notes.status === "done"
+          ? notes.value.notes
+              .filter((note) => note.possiblyBreaking)
+              .map((note) => note.version)
+          : [],
+      ),
+    [notes],
+  );
   if (result === null) return <SectionSkeleton />;
   if (!result.checked || result.current === null || result.latest === null) {
     return <NotChecked result={result} />;
@@ -419,7 +399,10 @@ function Versions({ row, details }: { row: ReportRow; details: DetailsState }) {
         <Skeleton className="h-3 w-full" />
       ) : details.status === "done" ? (
         details.value.releases.length > 0 ? (
-          <ReleaseTimeline releases={details.value.releases} />
+          <ReleaseTimeline
+            releases={details.value.releases}
+            flagged={flagged}
+          />
         ) : (
           <p className="text-xs text-muted-foreground">{copy.upToDate}</p>
         )
@@ -444,31 +427,48 @@ function NotChecked({ result }: { result: PackageRowJson }) {
   );
 }
 
-function Vulnerabilities({
+/**
+ * screens 5.9: the first non-empty tab opens. The vulnerabilities are known
+ * at once; the release notes may still be loading, so a package without
+ * vulnerabilities opens on them either way.
+ */
+function PackageTabs({
   vulnerabilities,
+  notes,
 }: {
   vulnerabilities: readonly Vulnerability[];
+  notes: ReleaseNotesState;
 }) {
   return (
-    <section aria-labelledby="package-vulnerabilities" className="grid gap-2">
-      <h3 id="package-vulnerabilities" className="text-sm font-semibold">
-        {copy.vulnerabilities(vulnerabilities.length)}
-      </h3>
-      {vulnerabilities.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {copy.noVulnerabilities}
-        </p>
-      ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border">
-          {vulnerabilities.map((vulnerability) => (
-            <VulnerabilityItem
-              key={vulnerability.primaryId}
-              vulnerability={vulnerability}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Tabs
+      defaultValue={vulnerabilities.length > 0 ? "vulnerabilities" : "notes"}
+    >
+      <TabsList>
+        <TabsTrigger value="vulnerabilities">
+          {copy.vulnerabilities(vulnerabilities.length)}
+        </TabsTrigger>
+        <TabsTrigger value="notes">{copy.releaseNotes}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="vulnerabilities">
+        {vulnerabilities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {copy.noVulnerabilities}
+          </p>
+        ) : (
+          <ul className="divide-y divide-border rounded-xl border border-border">
+            {vulnerabilities.map((vulnerability) => (
+              <VulnerabilityItem
+                key={vulnerability.primaryId}
+                vulnerability={vulnerability}
+              />
+            ))}
+          </ul>
+        )}
+      </TabsContent>
+      <TabsContent value="notes">
+        <ReleaseNotes state={notes} />
+      </TabsContent>
+    </Tabs>
   );
 }
 

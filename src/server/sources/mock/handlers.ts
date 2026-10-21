@@ -3,13 +3,14 @@ import { http, HttpResponse } from "msw/http";
 import semver from "semver";
 import { z } from "zod";
 import type { OsvRecord } from "../../analysis/osv-record";
+import { GITHUB_API_URL } from "../github";
 import { NPM_REGISTRY_URL } from "../npm";
 import { OSV_API_URL } from "../osv";
 
-// Fake npm and OSV for `MOCK_EXTERNAL=1` (dev, e2e): the sample project from
-// the landing gets every kind of finding, and results arrive slowly enough to
-// watch the report fill in. A package named `fail-*` gets a 503, which makes
-// the check partial (or failed if it is the only one).
+// Fake npm, OSV and GitHub releases for `MOCK_EXTERNAL=1` (dev, e2e): the
+// sample project from the landing gets every kind of finding, and results
+// arrive slowly enough to watch the report fill in. A package named `fail-*`
+// gets a 503, which makes the check partial (or failed if it is the only one).
 
 type MockPackage = {
   /** Version → publish date. */
@@ -172,6 +173,40 @@ const slow = () => {
   return delay(base / 2 + Math.random() * base);
 };
 
+// Release notes for the package card: every version gets a release, except
+// where a package shows another state of the "Release notes" tab.
+const RELEASE_NOTES: Record<string, string> = {
+  // A minor flagged by its notes: a red dot on the release scale.
+  moment: "### Deprecated\n- `moment().lang()` is deprecated, use `locale()`.",
+  // An unbroken URL that must wrap instead of widening the card.
+  axios:
+    "## Bug Fixes\n- Absolute URLs no longer bypass `baseURL`.\n\n" +
+    "**Full Changelog**: https://github.com/mock/axios/compare/0123456789abcdef0123456789abcdef01234567...fedcba9876543210fedcba9876543210fedcba98",
+};
+// Its repository has no releases: "No release notes published."
+const NO_RELEASES = new Set(["lodash"]);
+// Its releases answer 503: "Couldn't load release notes. Retry".
+const RELEASES_FAIL = new Set(["eslint"]);
+
+function mockReleases(name: string) {
+  const pkg = PACKAGES[name] ?? GENERIC;
+  if (NO_RELEASES.has(name)) return [];
+  return Object.entries(pkg.versions)
+    .sort(([a], [b]) => semver.rcompare(a, b))
+    .map(([version, date]) => ({
+      tag_name: `v${version}`,
+      name: `v${version}`,
+      body:
+        `${RELEASE_NOTES[name] ?? ""}\n\n## Features\n` +
+        `- Mock improvements in **${name}** ${version}.\n` +
+        `- See [the docs](https://example.com/${name}).`,
+      draft: false,
+      prerelease: false,
+      published_at: `${date}T12:00:00Z`,
+      html_url: `https://github.com/mock/${name}/releases/tag/v${version}`,
+    }));
+}
+
 const batchSchema = z.object({
   queries: z.array(
     z.object({
@@ -229,6 +264,18 @@ export const mockHandlers = [
       })),
     });
   }),
+
+  http.get(
+    `${GITHUB_API_URL}/repos/mock/:repo/releases`,
+    async ({ params }) => {
+      const name = String(params.repo);
+      await slow();
+      if (RELEASES_FAIL.has(name)) {
+        return new HttpResponse(null, { status: 503 });
+      }
+      return HttpResponse.json(mockReleases(name));
+    },
+  ),
 
   http.get(`${OSV_API_URL}/vulns/:id`, ({ params }) => {
     const vuln = VULNERABILITIES.find(({ id }) => id === params.id);

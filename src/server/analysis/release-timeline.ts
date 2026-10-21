@@ -9,21 +9,22 @@ export type TimelineRelease = {
   position: number;
   /**
    * The major version changes here: always possibly breaking (spec 7.2).
-   * Minor releases flagged by their release notes come with task 19.
+   * Minor releases flagged by their release notes are marked by the card,
+   * which loads the notes separately.
    */
   major: boolean;
 };
 
-/** Stable releases after `current` up to `latest`, oldest first. */
-export function releaseTimeline(
+/** Stable versions after `current` up to `latest`, oldest first. */
+export function versionsSince(
   registry: RegistryPackage,
   current: string,
   latest: string,
-): TimelineRelease[] {
+): string[] {
   if (semver.valid(current) === null || semver.valid(latest) === null) {
     return [];
   }
-  const versions = Object.keys(registry.versions)
+  return Object.keys(registry.versions)
     .filter(
       (version) =>
         semver.valid(version) !== null &&
@@ -32,6 +33,15 @@ export function releaseTimeline(
         semver.lte(version, latest),
     )
     .sort(semver.compare);
+}
+
+/** Stable releases after `current` up to `latest`, oldest first. */
+export function releaseTimeline(
+  registry: RegistryPackage,
+  current: string,
+  latest: string,
+): TimelineRelease[] {
+  const versions = versionsSince(registry, current, latest);
 
   const dates = versions.map((version) => publishedMs(registry, version));
   const start = publishedMs(registry, current);
