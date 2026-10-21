@@ -1,5 +1,6 @@
 import type { CheckFailureCode } from "@/server/analysis/check-outcome";
 import type { ScoreCategory } from "@/server/analysis/health-score";
+import type { UncheckedReason } from "@/server/analysis/resolve-versions";
 import type { Severity } from "@/server/analysis/severity";
 import { minutesUntilRetry } from "../check/copy";
 
@@ -99,10 +100,33 @@ export const reportCopy = {
   table: {
     caption: "Dependencies",
     package: "Package",
+    current: "Current",
+    latest: "Latest",
+    behind: "Behind",
+    vulnerabilities: "Vulnerabilities",
+    released: "Released",
+    status: "Status",
     dev: "dev",
+    deprecated: "deprecated",
+    none: "—",
+    noneLabel: "None",
+    highestSeverity: (severity: Severity) => `, highest ${severity}`,
     pending: "Checking…",
     ready: (ready: number, total: number) => `${ready} of ${total} ready`,
   },
+};
+
+// Keyed by code so a new reason fails typecheck until it has text.
+export const uncheckedReasonCopy: Record<UncheckedReason, string> = {
+  "not-from-registry": "Not from npm registry",
+  "invalid-specifier": "Invalid version range",
+  "no-matching-version": "No version matches the range",
+  "unknown-tag": "Unknown dist-tag",
+  "no-stable-version": "No stable version",
+  "not-in-registry": "Not found in npm registry",
+  "registry-rate-limited": "npm rate limit reached",
+  "registry-unavailable": "Couldn't reach the npm registry",
+  "vulnerabilities-unavailable": "Couldn't reach OSV.dev",
 };
 
 // Keyed by code so a new failure code fails typecheck until it has text.
