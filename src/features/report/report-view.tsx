@@ -7,6 +7,7 @@ import { getReportPage } from "@/server/db/report-page";
 import { checkAgain, retry } from "./actions";
 import { CheckBanner, CheckFailed, CheckProgress } from "./check-status";
 import { checkFailureCopy } from "./copy";
+import { PackageCard } from "./package-card";
 import { ReportProvider } from "./report-context";
 import { ReportHeader, type ReportSource } from "./report-header";
 import { ReportSummary, ReportSummarySkeleton } from "./report-summary";
@@ -49,6 +50,8 @@ export async function ReportView({
     <main className="mx-auto grid max-w-320 grid-cols-1 gap-6 px-4 pt-8 pb-16 sm:px-6">
       <ReportProvider
         key={`${check?.id}:${check?.status}`}
+        reportId={report.id}
+        guest={report.expiresAt !== null}
         checkId={check?.id}
         running={running}
         packageManager={report.packageManager}
@@ -106,6 +109,7 @@ export async function ReportView({
             {children}
           </>
         )}
+        <PackageCard />
       </ReportProvider>
     </main>
   );

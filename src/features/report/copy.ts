@@ -197,6 +197,39 @@ export const reportCopy = {
     empty: "No known vulnerabilities in your dependencies.",
     notChecked: "No packages have been checked yet.",
   },
+  // screens 5.9
+  card: {
+    notFound: "Package not found in this project",
+    npm: "npm",
+    npmLabel: (name: string) => `${name} on npm (opens in a new tab)`,
+    repository: "Repository",
+    repositoryLabel: "Repository (opens in a new tab)",
+    showMore: "Show more",
+    showLess: "Show less",
+    license: "License",
+    noLicense: "No license",
+    noDescription: "No description.",
+    current: "Current",
+    latest: "Latest",
+    loading: "Loading package details…",
+    detailsFailed: "Couldn't load package details.",
+    retry: "Retry",
+    upToDate: "Up to date",
+    releases: (count: number, majors: number) =>
+      `${plural(count, "release", "releases")} since current` +
+      (majors > 0 ? `, ${plural(majors, "major", "majors")}` : ""),
+    releasePoint: (version: string, date: string | null, major: boolean) =>
+      [version, date, major ? "major, possibly breaking" : null]
+        .filter(Boolean)
+        .join(" · "),
+    vulnerabilities: (count: number) => `Vulnerabilities (${count})`,
+    noVulnerabilities: "No known vulnerabilities.",
+    notChecked: "Not checked",
+    copyCommand: "Copy update command",
+    commandCopied: "Update command copied",
+    copyFailed: "Couldn't copy the command.",
+    guestHint: "Save project to snooze or plan updates",
+  },
   empty: {
     noMatches: "No packages match these filters.",
     clearFilters: "Clear filters",

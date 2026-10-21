@@ -16,7 +16,14 @@ import {
   CircleCheck,
   SearchX,
 } from "lucide-react";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { LagBadge, PackageStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,6 +64,7 @@ import {
 } from "./selection";
 import { SelectionBar } from "./selection-bar";
 import { severityText } from "./severity-text";
+import { fromNestedControl, useOpenPackage } from "./use-open-package";
 import { useReportFilters } from "./use-report-filters";
 
 const copy = reportCopy.table;
@@ -139,6 +147,8 @@ export function DependencyTable({
   saveHint?: boolean;
 }) {
   const { rows, running } = useReport();
+  const { pkg, openPackage } = useOpenPackage();
+  const opener: PackageOpener = { open: pkg, onOpen: openPackage };
   const filterState = useReportFilters();
   const { filters, appliedQuery, setFilters, clear } = filterState;
   const { type, lag, vuln, status } = filters;
@@ -245,13 +255,19 @@ export function DependencyTable({
       ) : (
         <>
           <div className="hidden md:block">
-            <TableView table={table} selection={selection} virtual={virtual} />
+            <TableView
+              table={table}
+              selection={selection}
+              opener={opener}
+              virtual={virtual}
+            />
           </div>
           {/* screens 5.5: < 768px the table becomes a list of cards. */}
           <div className="md:hidden">
             <DependencyCards
               rows={table.getRowModel().rows.map((row) => row.original)}
               selection={selection}
+              opener={opener}
               virtual={virtual}
             />
           </div>
@@ -268,6 +284,31 @@ export type Selection = {
   toggleAll: (checked: boolean) => void;
 };
 
+/** screens 5.5: a click or Enter on a row opens the package card. */
+export type PackageOpener = {
+  open: string | null;
+  onOpen: (name: string) => void;
+};
+
+/** Click and Enter on a row or card, except on the controls inside it. */
+export function rowOpenHandlers(name: string, opener: PackageOpener) {
+  return {
+    "data-package": name,
+    tabIndex: 0,
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      if (!fromNestedControl(event.target, event.currentTarget)) {
+        opener.onOpen(name);
+      }
+    },
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key === "Enter" && event.target === event.currentTarget) {
+        event.preventDefault();
+        opener.onOpen(name);
+      }
+    },
+  };
+}
+
 type Table = ReturnType<typeof useTable<typeof features, ReportRow>>;
 
 /** Row height before measuring; rows with the `dev` line come out taller. */
@@ -276,10 +317,12 @@ const ESTIMATED_ROW_HEIGHT = 41;
 function TableView({
   table,
   selection,
+  opener,
   virtual,
 }: {
   table: Table;
   selection: Selection;
+  opener: PackageOpener;
   virtual: boolean;
 }) {
   const rows = table.getRowModel().rows;
@@ -398,20 +441,28 @@ function TableView({
           {shown.map(({ row, index }) => {
             const { result, updatedAt } = row.original;
             const isSelected = selection.has(row.id);
+            const isOpen = opener.open === row.id;
             return (
               <tr
                 // A new key replays the highlight when a result arrives.
                 key={`${row.id}:${updatedAt ?? ""}`}
+                {...rowOpenHandlers(row.id, opener)}
                 ref={virtual ? virtualizer.measureElement : undefined}
                 data-index={index}
                 aria-busy={result === null || undefined}
                 className={cn(
-                  "h-10 border-t border-border",
+                  "h-10 cursor-pointer border-t border-border hover:bg-subtle focus-visible:-outline-offset-2",
                   isSelected && "bg-accent",
                   updatedAt !== undefined && "animate-row-flash",
                 )}
               >
-                <td className="py-1.5 pr-0 pl-4">
+                {/* style guide 5: the open row gets a 2px brand bar on the left. */}
+                <td
+                  className={cn(
+                    "border-l-2 py-1.5 pr-0 pl-3.5",
+                    isOpen ? "border-l-brand" : "border-l-transparent",
+                  )}
+                >
                   <Checkbox
                     aria-label={copy.select(row.id)}
                     checked={isSelected}

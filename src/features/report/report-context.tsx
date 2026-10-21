@@ -9,6 +9,9 @@ import { buildRows, type ReportRow, type StreamState } from "./report-rows";
 import { useCheckStream } from "./use-check-stream";
 
 type ReportContextValue = {
+  reportId: string;
+  /** Guest reports can't snooze or plan, so they get a "Save project" hint. */
+  guest: boolean;
   checkId: string | undefined;
   running: boolean;
   packageManager: PackageManager;
@@ -26,6 +29,8 @@ const ReportContext = createContext<ReportContextValue | null>(null);
  * changes, so the stream always starts from what the server just loaded.
  */
 export function ReportProvider({
+  reportId,
+  guest,
   checkId,
   running,
   packageManager,
@@ -35,6 +40,8 @@ export function ReportProvider({
   currentRows,
   children,
 }: {
+  reportId: string;
+  guest: boolean;
   checkId: string | undefined;
   running: boolean;
   packageManager: PackageManager;
@@ -72,6 +79,8 @@ export function ReportProvider({
   return (
     <ReportContext
       value={{
+        reportId,
+        guest,
         checkId,
         running,
         packageManager,

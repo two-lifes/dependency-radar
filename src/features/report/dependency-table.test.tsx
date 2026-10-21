@@ -5,13 +5,17 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { createLoader } from "nuqs";
 import { NuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { DependencyTable, VIRTUALIZE_FROM } from "./dependency-table";
+import { filterParsers } from "./filters";
 import { ReportProvider } from "./report-context";
+import { buildRows } from "./report-rows";
+import { orderedRows } from "./row-order";
 import { FakeEventSource } from "./test/fake-event-source";
 
 const refresh = vi.fn();
@@ -76,6 +80,8 @@ describe("DependencyTable", () => {
   it("turns skeleton rows into results as they stream in", async () => {
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager="npm"
         checkId="c1"
         running
@@ -157,6 +163,8 @@ describe("DependencyTable columns and sorting", () => {
     render(
       <TooltipProvider delayDuration={0}>
         <ReportProvider
+          reportId="r1"
+          guest
           packageManager="npm"
           checkId="c1"
           running={false}
@@ -321,6 +329,8 @@ describe("DependencyTable filters in the URL", () => {
   ) =>
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager="npm"
         checkId="c1"
         running={false}
@@ -437,6 +447,8 @@ describe("DependencyTable filters in the URL", () => {
       result(name, { lagKind: "current", latest: "1.0.0", lagMajors: null });
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager="npm"
         checkId="c1"
         running={false}
@@ -478,6 +490,8 @@ describe("DependencyTable selection", () => {
   const renderTable = (search = "", manager: "npm" | "pnpm" = "npm") =>
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager={manager}
         checkId="c1"
         running={false}
@@ -561,6 +575,8 @@ describe("DependencyTable on small screens", () => {
     const onUrlUpdate = vi.fn();
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager="npm"
         checkId="c1"
         running={false}
@@ -628,6 +644,8 @@ describe("DependencyTable with 500+ rows", () => {
   it("renders only the visible rows and keeps the header", () => {
     render(
       <ReportProvider
+        reportId="r1"
+        guest
         packageManager="npm"
         checkId="c1"
         running={false}
@@ -654,5 +672,96 @@ describe("DependencyTable with 500+ rows", () => {
     expect(
       within(rendered[1] ?? document.body).getByText("pkg-0000"),
     ).toBeInTheDocument();
+  });
+});
+
+// The package card's j/k (screens 5.9) walk `orderedRows`; it must match
+// what the table shows for every sort.
+describe("DependencyTable order matches orderedRows", () => {
+  const rows: PackageRowJson[] = [
+    result("b-pkg", {
+      lagKind: "minor",
+      latest: "1.2.0",
+      lagMajors: null,
+      lastReleaseAt: "2026-03-01T00:00:00.000Z",
+    }),
+    result("a-pkg", {
+      lagKind: "current",
+      latest: "1.0.0",
+      lagMajors: null,
+      lastReleaseAt: "2026-05-01T00:00:00.000Z",
+    }),
+    result("d-pkg", {
+      vulnerabilities: [
+        {
+          ids: ["GHSA-1"],
+          primaryId: "GHSA-1",
+          severity: "low",
+          fixedIn: null,
+        },
+      ],
+      lastReleaseAt: "2026-01-01T00:00:00.000Z",
+    }),
+    result("c-pkg", {
+      checked: false,
+      reason: "not-from-registry",
+      registryName: null,
+      current: null,
+      latest: null,
+      lagKind: null,
+      lagMajors: null,
+      status: null,
+    }),
+    result("e-pkg", { type: "dev", lagKind: "minor", lagMajors: null }),
+  ];
+  const deps = rows.map((row) => ({
+    name: row.name,
+    specifier: "^1.0.0",
+    type: row.type,
+  }));
+
+  beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    "",
+    "?sort=name",
+    "?sort=-name",
+    "?sort=behind",
+    "?sort=-behind",
+    "?sort=vulns",
+    "?sort=-vulns",
+    "?sort=released",
+    "?sort=-released",
+    "?type=prod&sort=-behind",
+  ])("%s", (search) => {
+    render(
+      <TooltipProvider>
+        <ReportProvider
+          reportId="r1"
+          guest
+          packageManager="npm"
+          checkId="c1"
+          running={false}
+          totalPackages={rows.length}
+          dependencies={deps}
+          previousRows={[]}
+          currentRows={rows}
+        >
+          <DependencyTable />
+        </ReportProvider>
+      </TooltipProvider>,
+      { wrapper: withUrl(search) },
+    );
+    const shown = within(screen.getByRole("table"))
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.getAttribute("data-package"));
+    const filters = createLoader(filterParsers)(search);
+    const expected = orderedRows(
+      buildRows(deps, { previous: [], current: rows, streamed: {} }),
+      filters,
+    ).map((row) => row.name);
+    expect(shown).toEqual(expected);
   });
 });

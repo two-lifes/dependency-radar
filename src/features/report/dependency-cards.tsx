@@ -9,7 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 import { maxSeverity } from "@/server/analysis/severity";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
-import type { Selection } from "./dependency-table";
+import {
+  type PackageOpener,
+  rowOpenHandlers,
+  type Selection,
+} from "./dependency-table";
 import type { ReportRow } from "./report-rows";
 import { severityText } from "./severity-text";
 
@@ -25,10 +29,12 @@ const ESTIMATED_CARD_HEIGHT = 92;
 export function DependencyCards({
   rows,
   selection,
+  opener,
   virtual,
 }: {
   rows: readonly ReportRow[];
   selection: Selection;
+  opener: PackageOpener;
   virtual: boolean;
 }) {
   const listRef = useRef<HTMLUListElement>(null);
@@ -71,11 +77,16 @@ export function DependencyCards({
       {shown.map(({ row, index }) => (
         <li
           key={`${row.name}:${row.updatedAt ?? ""}`}
+          {...rowOpenHandlers(row.name, opener)}
           ref={virtual ? virtualizer.measureElement : undefined}
           data-index={index}
           aria-busy={row.result === null || undefined}
           className={cn(
-            "grid gap-1.5 p-4",
+            // style guide 5: the open package gets a 2px brand bar on the left.
+            "grid cursor-pointer gap-1.5 border-l-2 py-4 pr-4 pl-3.5 focus-visible:-outline-offset-2",
+            opener.open === row.name
+              ? "border-l-brand"
+              : "border-l-transparent",
             selection.has(row.name) && "bg-accent",
             row.updatedAt !== undefined && "animate-row-flash",
           )}

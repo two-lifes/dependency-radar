@@ -1,5 +1,6 @@
 import { maxSeverity, SEVERITIES } from "@/server/analysis/severity";
 import type { PackageRowJson } from "@/server/check/package-row";
+import { filterRows, sortingFromUrl, type Filters } from "./filters";
 import type { ReportRow } from "./report-rows";
 
 // Sort keys per column (screens 5.5). `undefined` means there is nothing to
@@ -87,4 +88,65 @@ export function defaultOrder(rows: readonly ReportRow[]): ReportRow[] {
       compareNames(a.row.name, b.row.name),
   );
   return [...known.map(({ row }) => row), ...rest];
+}
+
+type ColumnSort = {
+  /** undefined: nothing to compare, the row goes last. */
+  defined: (row: ReportRow) => boolean;
+  /** Called only when both rows are defined. */
+  compare: (a: ReportRow, b: ReportRow) => number;
+};
+
+const byNumber = (key: (row: ReportRow) => number | undefined): ColumnSort => ({
+  defined: (row) => key(row) !== undefined,
+  compare: (a, b) => (key(a) ?? 0) - (key(b) ?? 0),
+});
+
+// The same keys and comparators as the table columns.
+const COLUMN_SORTS: Record<string, ColumnSort> = {
+  name: {
+    defined: () => true,
+    compare: (a, b) => compareNames(a.name, b.name),
+  },
+  behind: byNumber(lagRank),
+  vulnerabilities: {
+    defined: (row) => vulnerabilityRank(row) !== undefined,
+    compare: (a, b) => {
+      const rankA = vulnerabilityRank(a);
+      const rankB = vulnerabilityRank(b);
+      return rankA && rankB ? compareVulnerabilityRank(rankA, rankB) : 0;
+    },
+  },
+  released: byNumber(releasedAt),
+};
+
+/**
+ * The table's sort outside the table (screens 5.9 `j`/`k`): rows with
+ * nothing to compare go last in both directions, ties keep the input order.
+ * Mirrors TanStack's sorted row model with `sortUndefined: "last"`.
+ */
+export function sortRows(
+  rows: readonly ReportRow[],
+  sort: Filters["sort"],
+): ReportRow[] {
+  const [sorting] = sortingFromUrl(sort);
+  const column = sorting && COLUMN_SORTS[sorting.id];
+  if (!sorting || !column) return [...rows];
+  const direction = sorting.desc ? -1 : 1;
+  return rows
+    .map((row, index) => ({ row, index, defined: column.defined(row) }))
+    .sort((a, b) => {
+      if (a.defined !== b.defined) return a.defined ? -1 : 1;
+      const order = a.defined ? direction * column.compare(a.row, b.row) : 0;
+      return order || a.index - b.index;
+    })
+    .map(({ row }) => row);
+}
+
+/** Rows in the order the table shows them for these search params. */
+export function orderedRows(
+  rows: readonly ReportRow[],
+  filters: Filters,
+): ReportRow[] {
+  return sortRows(filterRows(defaultOrder(rows), filters), filters.sort);
 }

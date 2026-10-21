@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { CheckPackageRow } from "../check/package-row";
 import { pickChecks } from "../check/report-view";
 import type { Db } from "./client";
@@ -109,4 +109,27 @@ export async function getReportPage(
     withRows(previous),
   ]);
   return { report, check, previous: before };
+}
+
+/**
+ * The newest result for one package of a report, from whichever check has
+ * it (during "Check again" that is still the previous one).
+ */
+export async function getReportPackage(
+  db: Db,
+  reportId: string,
+  name: string,
+): Promise<
+  { report: ReportMeta; row: CheckPackageRow | undefined } | undefined
+> {
+  const report = await getReportMeta(db, reportId);
+  if (!report) return undefined;
+  const [found] = await db
+    .select({ row: checkPackages })
+    .from(checkPackages)
+    .innerJoin(checks, eq(checks.id, checkPackages.checkId))
+    .where(and(eq(checks.reportId, reportId), eq(checkPackages.name, name)))
+    .orderBy(desc(checks.startedAt))
+    .limit(1);
+  return { report, row: found?.row };
 }

@@ -6,7 +6,9 @@ import {
   compareVulnerabilityRank,
   defaultOrder,
   lagRank,
+  orderedRows,
   releasedAt,
+  sortRows,
   vulnerabilityRank,
 } from "./row-order";
 
@@ -150,5 +152,108 @@ describe("defaultOrder", () => {
     const rows = [row("b"), row("a")];
     defaultOrder(rows);
     expect(rows.map((r) => r.name)).toEqual(["b", "a"]);
+  });
+});
+
+describe("sortRows", () => {
+  const names = (rows: ReportRow[]) => rows.map((r) => r.name);
+  const rows = [
+    row("b", { lagKind: "minor" }),
+    unchecked("pending-ish"),
+    row("a", { lagKind: "major", lagMajors: 2 }),
+    row("c", { lagKind: "minor" }),
+    row("waiting", null),
+  ];
+
+  it("keeps the input order without a sort", () => {
+    expect(names(sortRows(rows, null))).toEqual(names(rows));
+  });
+
+  it("sorts by name both ways", () => {
+    expect(names(sortRows(rows, "name"))).toEqual([
+      "a",
+      "b",
+      "c",
+      "pending-ish",
+      "waiting",
+    ]);
+    expect(names(sortRows(rows, "-name"))).toEqual([
+      "waiting",
+      "pending-ish",
+      "c",
+      "b",
+      "a",
+    ]);
+  });
+
+  it("puts rows with nothing to compare last in both directions, ties in input order", () => {
+    expect(names(sortRows(rows, "behind"))).toEqual([
+      "b",
+      "c",
+      "a",
+      "pending-ish",
+      "waiting",
+    ]);
+    expect(names(sortRows(rows, "-behind"))).toEqual([
+      "a",
+      "b",
+      "c",
+      "pending-ish",
+      "waiting",
+    ]);
+  });
+
+  it("sorts by vulnerabilities and by release date", () => {
+    const sample = [
+      row("none", { lastReleaseAt: "2026-01-01T00:00:00.000Z" }),
+      row("high", {
+        vulnerabilities: [vuln("high")],
+        lastReleaseAt: "2026-03-01T00:00:00.000Z",
+      }),
+      row("critical", {
+        vulnerabilities: [vuln("critical")],
+        lastReleaseAt: "2026-02-01T00:00:00.000Z",
+      }),
+    ];
+    expect(names(sortRows(sample, "-vulns"))).toEqual([
+      "critical",
+      "high",
+      "none",
+    ]);
+    expect(names(sortRows(sample, "released"))).toEqual([
+      "none",
+      "critical",
+      "high",
+    ]);
+  });
+});
+
+describe("orderedRows", () => {
+  it("applies the default order, the filters and the sort like the table", () => {
+    const rows = [
+      row("zeta", { lagKind: "patch" }),
+      row("alpha", { lagKind: "major", lagMajors: 1 }),
+      row("beta", { lagKind: "current" }),
+      row("gamma", { vulnerabilities: [vuln("low")] }),
+    ];
+    const filters = {
+      q: "",
+      type: null,
+      lag: null,
+      vuln: null,
+      status: null,
+      sort: null,
+    };
+    expect(orderedRows(rows, filters).map((r) => r.name)).toEqual([
+      "gamma",
+      "alpha",
+      "zeta",
+      "beta",
+    ]);
+    expect(
+      orderedRows(rows, { ...filters, q: "a", sort: "-name" }).map(
+        (r) => r.name,
+      ),
+    ).toEqual(["zeta", "gamma", "beta", "alpha"]);
   });
 });

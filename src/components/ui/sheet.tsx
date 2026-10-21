@@ -5,7 +5,11 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/cn";
 
-/** A bottom sheet: a Dialog (focus trap, Esc, focus return) docked to the bottom. */
+/**
+ * A sheet: a Dialog (focus trap, Esc, focus return) docked to an edge.
+ * `bottom` slides up; `end` is a 480px side panel that becomes a full-screen
+ * sheet below 768px (the package card, screens 5.9).
+ */
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
 export const SheetClose = DialogPrimitive.Close;
@@ -14,14 +18,22 @@ export function SheetContent({
   className,
   children,
   closeLabel = "Close",
+  side = "bottom",
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content> & { closeLabel?: string }) {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  closeLabel?: string;
+  side?: "bottom" | "end";
+}) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 animate-fade-in bg-black/40 dark:bg-black/60" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 grid max-h-dvh animate-pop-in gap-4 overflow-y-auto rounded-t-xl border-t border-border bg-card p-4 text-card-foreground shadow-overlay",
+          "fixed z-50 bg-card text-card-foreground shadow-overlay",
+          side === "bottom" &&
+            "inset-x-0 bottom-0 grid max-h-dvh animate-pop-in gap-4 overflow-y-auto rounded-t-xl border-t border-border p-4",
+          side === "end" &&
+            "inset-0 flex animate-pop-in flex-col md:left-auto md:w-120 md:animate-slide-in md:border-l md:border-border",
           className,
         )}
         {...props}

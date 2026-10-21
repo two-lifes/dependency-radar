@@ -190,6 +190,7 @@
   /* style guide §7: only opacity and a small shift; reduced motion is handled in base */
   --animate-fade-in: fade-in 160ms var(--ease-out);
   --animate-pop-in: pop-in 160ms var(--ease-out);
+  --animate-slide-in: slide-in 160ms var(--ease-out);
   --animate-skeleton: skeleton 1.5s ease-in-out infinite;
   /* style guide §7: an updated table row fades from brand-soft in 1.2 s */
   --animate-row-flash: row-flash 1.2s var(--ease-out);
@@ -203,6 +204,13 @@
     from {
       opacity: 0;
       transform: translateY(4px);
+    }
+  }
+  /* style guide §7: the package card comes in from the right */
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
     }
   }
   @keyframes skeleton {
