@@ -657,9 +657,9 @@ describe("DependencyTable selection", () => {
     );
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith({
-        title:
-          "Update command copied. Includes 1 major update: next. Check release notes before applying.",
-        description: "npm i next@3.0.0 zod@1.0.1 && npm i -D vitest@1.2.0",
+        title: "Update command copied",
+        description:
+          "Includes 1 major update: next. Check release notes before applying.",
       }),
     );
   });
@@ -674,10 +674,7 @@ describe("DependencyTable selection", () => {
       }),
     );
     await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith({
-        title: "Update command copied",
-        description: "npm i zod@1.0.1",
-      }),
+      expect(toast).toHaveBeenCalledWith({ title: "Update command copied" }),
     );
   });
 
@@ -695,12 +692,11 @@ describe("DependencyTable selection", () => {
       }),
     );
     await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title:
-            "Update command copied. Includes 3 major updates: react, next and 1 more. Check release notes before applying.",
-        }),
-      ),
+      expect(toast).toHaveBeenCalledWith({
+        title: "Update command copied",
+        description:
+          "Includes 3 major updates: react, next and 1 more. Check release notes before applying.",
+      }),
     );
   });
 

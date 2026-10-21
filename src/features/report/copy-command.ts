@@ -4,8 +4,8 @@ import { reportCopy } from "./copy";
 const copy = reportCopy.selection;
 
 /**
- * Copies an update command; the toast shows it either way to copy by hand.
- * `majors` names the packages it moves across a major, to warn about them.
+ * Copies an update command. Only the failure toast shows the command, so it
+ * can be copied by hand; `majors` names the packages it moves across a major.
  */
 export async function copyUpdateCommand(
   command: string,
@@ -13,13 +13,14 @@ export async function copyUpdateCommand(
 ): Promise<void> {
   try {
     await navigator.clipboard.writeText(command);
-    toast({
-      title:
-        majors.length > 0
-          ? copy.commandCopiedWithMajors(majors)
-          : copy.commandCopied,
-      description: command,
-    });
+    toast(
+      majors.length > 0
+        ? {
+            title: copy.commandCopied,
+            description: copy.majorUpdatesWarning(majors),
+          }
+        : { title: copy.commandCopied },
+    );
   } catch {
     toast({ title: copy.copyFailed, description: command });
   }

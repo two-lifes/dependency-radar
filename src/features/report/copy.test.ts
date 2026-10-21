@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { reportCopy } from "./copy";
 
-const { commandCopiedWithMajors } = reportCopy.selection;
+const { majorUpdatesWarning } = reportCopy.selection;
 
-describe("commandCopiedWithMajors", () => {
+describe("majorUpdatesWarning", () => {
   it.each([
     [["react"], "1 major update: react."],
     [["react", "next"], "2 major updates: react and next."],
@@ -13,8 +13,8 @@ describe("commandCopiedWithMajors", () => {
       "4 major updates: react, next and 2 more.",
     ],
   ])("%j", (names, includes) => {
-    expect(commandCopiedWithMajors(names)).toBe(
-      `Update command copied. Includes ${includes} Check release notes before applying.`,
+    expect(majorUpdatesWarning(names)).toBe(
+      `Includes ${includes} Check release notes before applying.`,
     );
   });
 });
