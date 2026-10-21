@@ -7,9 +7,17 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, Ban } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Ban,
+  CircleCheck,
+  SearchX,
+} from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { LagBadge, PackageStatusBadge } from "@/components/status-badges";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -20,6 +28,13 @@ import { cn } from "@/lib/cn";
 import { maxSeverity, type Severity } from "@/server/analysis/severity";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
+import { DependencyToolbar } from "./dependency-toolbar";
+import {
+  filterRows,
+  hasActiveFilters,
+  sortingFromUrl,
+  sortingToUrl,
+} from "./filters";
 import { RelativeTime } from "./relative-time";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
@@ -31,6 +46,7 @@ import {
   releasedAt,
   vulnerabilityRank,
 } from "./row-order";
+import { useReportFilters } from "./use-report-filters";
 
 const copy = reportCopy.table;
 
@@ -98,101 +114,177 @@ const columns = helper.columns([
   }),
 ]);
 
-/** screens 5.5: rows fill in as the check streams results. */
-export function DependencyTable() {
-  const { rows } = useReport();
+/**
+ * screens 5.5: rows fill in as the check streams results; search, filters and
+ * sort live in the URL.
+ */
+export function DependencyTable({
+  saveHint = false,
+}: {
+  /** Guest reports add "Save project to get notified…" to "All up to date". */
+  saveHint?: boolean;
+}) {
+  const { rows, running } = useReport();
+  const filterState = useReportFilters();
+  const { filters, appliedQuery, setFilters, clear } = filterState;
+  const { type, lag, vuln, status } = filters;
+  // The search applies after the typing delay, the menus at once.
+  const applied = useMemo(
+    () => ({ q: appliedQuery, type, lag, vuln, status, sort: null }),
+    [appliedQuery, type, lag, vuln, status],
+  );
+  const filtering = hasActiveFilters(applied);
   // An empty sorting state shows this order (screens 5.5 default).
-  const data = useMemo(() => defaultOrder(rows), [rows]);
+  const ordered = useMemo(() => defaultOrder(rows), [rows]);
+  const data = useMemo(() => filterRows(ordered, applied), [ordered, applied]);
+  const sorting = useMemo(() => sortingFromUrl(filters.sort), [filters.sort]);
   const table = useTable({
     features,
     columns,
     data,
     getRowId: (row) => row.name,
+    state: { sorting },
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      void setFilters({ sort: sortingToUrl(next) });
+    },
     // screens 5.5: a repeated click only flips the direction.
     enableSortingRemoval: false,
     enableMultiSort: false,
     sortDescFirst: false,
   });
-  const ready = rows.filter((row) => row.result !== null).length;
+
+  const allUpToDate =
+    !filtering &&
+    !running &&
+    rows.length > 0 &&
+    rows.every(
+      ({ result }) =>
+        result?.checked === true &&
+        result.lagKind === "current" &&
+        result.vulnerabilities.length === 0,
+    );
+  if (allUpToDate) {
+    return (
+      <EmptyState icon={<CircleCheck aria-hidden className="text-success" />}>
+        <p className="text-base font-medium">
+          {reportCopy.empty.allUpToDate(rows.length)}
+        </p>
+        {saveHint ? (
+          <p className="text-base text-muted-foreground">
+            {reportCopy.empty.saveToGetNotified}
+          </p>
+        ) : null}
+      </EmptyState>
+    );
+  }
 
   return (
-    <section className="grid gap-2">
-      <p
-        className="justify-self-end text-sm text-muted-foreground tabular-nums"
-        aria-live="polite"
-      >
-        {copy.ready(ready, rows.length)}
-      </p>
-      {/* relative: sr-only cells are absolute and would otherwise widen the page. */}
-      <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full text-left text-base">
-          <caption className="sr-only">{copy.caption}</caption>
-          <thead className="bg-subtle">
-            {table.getHeaderGroups().map((group) => (
-              <tr key={group.id}>
-                {group.headers.map((header) => {
-                  const canSort = header.column.getCanSort();
-                  const sorted = header.column.getIsSorted();
-                  return (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      aria-sort={
-                        !canSort
-                          ? undefined
-                          : sorted === "asc"
-                            ? "ascending"
-                            : sorted === "desc"
-                              ? "descending"
-                              : "none"
-                      }
-                      className="h-9 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground"
-                    >
-                      {header.isPlaceholder ? null : canSort ? (
-                        <button
-                          type="button"
-                          onClick={header.column.getToggleSortingHandler()}
-                          className={cn(
-                            "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 hover:text-foreground",
-                            sorted && "text-foreground",
-                          )}
-                        >
+    <section className="grid gap-3">
+      <DependencyToolbar
+        state={filterState}
+        shown={data.length}
+        total={rows.length}
+      />
+      {data.length === 0 && filtering ? (
+        <EmptyState
+          icon={<SearchX aria-hidden className="text-muted-foreground" />}
+        >
+          <p className="text-base font-medium">{reportCopy.empty.noMatches}</p>
+          <Button variant="secondary" size="sm" onClick={clear}>
+            {reportCopy.empty.clearFilters}
+          </Button>
+        </EmptyState>
+      ) : (
+        // relative: sr-only cells are absolute and would otherwise widen the page.
+        <div className="relative overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full text-left text-base">
+            <caption className="sr-only">{copy.caption}</caption>
+            <thead className="bg-subtle">
+              {table.getHeaderGroups().map((group) => (
+                <tr key={group.id}>
+                  {group.headers.map((header) => {
+                    const canSort = header.column.getCanSort();
+                    const sorted = header.column.getIsSorted();
+                    return (
+                      <th
+                        key={header.id}
+                        scope="col"
+                        aria-sort={
+                          !canSort
+                            ? undefined
+                            : sorted === "asc"
+                              ? "ascending"
+                              : sorted === "desc"
+                                ? "descending"
+                                : "none"
+                        }
+                        className="h-9 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground"
+                      >
+                        {header.isPlaceholder ? null : canSort ? (
+                          <button
+                            type="button"
+                            onClick={header.column.getToggleSortingHandler()}
+                            className={cn(
+                              "-mx-1 inline-flex items-center gap-1 rounded-sm px-1 hover:text-foreground",
+                              sorted && "text-foreground",
+                            )}
+                          >
+                            <table.FlexRender header={header} />
+                            <SortIcon sorted={sorted} />
+                          </button>
+                        ) : (
                           <table.FlexRender header={header} />
-                          <SortIcon sorted={sorted} />
-                        </button>
-                      ) : (
-                        <table.FlexRender header={header} />
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => {
-              const { result, updatedAt } = row.original;
-              return (
-                <tr
-                  // A new key replays the highlight when a result arrives.
-                  key={`${row.id}:${updatedAt ?? ""}`}
-                  aria-busy={result === null || undefined}
-                  className={cn(
-                    "h-10 border-t border-border",
-                    updatedAt !== undefined && "animate-row-flash",
-                  )}
-                >
-                  {row.getAllCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-1.5 whitespace-nowrap">
-                      <table.FlexRender cell={cell} />
-                    </td>
-                  ))}
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row) => {
+                const { result, updatedAt } = row.original;
+                return (
+                  <tr
+                    // A new key replays the highlight when a result arrives.
+                    key={`${row.id}:${updatedAt ?? ""}`}
+                    aria-busy={result === null || undefined}
+                    className={cn(
+                      "h-10 border-t border-border",
+                      updatedAt !== undefined && "animate-row-flash",
+                    )}
+                  >
+                    {row.getAllCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className="px-4 py-1.5 whitespace-nowrap"
+                      >
+                        <table.FlexRender cell={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmptyState({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid justify-items-center gap-3 rounded-xl border border-border bg-card px-4 py-12 text-center [&>svg]:size-5">
+      {icon}
+      {children}
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { type ReactNode, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { cancel, resume, retry } from "./actions";
 import { reportCopy } from "./copy";
+import { serializeFilters } from "./filters";
 import { useReport } from "./report-context";
 
 const copy = reportCopy;
@@ -109,13 +110,12 @@ export function CheckBanner({
     );
   }
 
-  // "Show" turns on the unchecked filter; URL filters arrive in task 14.
-  const query = new URLSearchParams(search.toString());
-  query.set("status", "unchecked");
+  // "Show" turns on the unchecked filter and keeps the rest of the query.
+  const query = serializeFilters(search, { status: "unchecked" });
   return (
     <Banner icon={<AlertTriangle />} text={copy.banner.partial(sourceFailures)}>
       <Button asChild variant="secondary" size="sm">
-        <Link href={`${basePath}/dependencies?${query.toString()}`}>
+        <Link href={`${basePath}/dependencies${query}`}>
           {copy.banner.show}
         </Link>
       </Button>

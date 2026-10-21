@@ -3,6 +3,7 @@ import type { ScoreCategory } from "@/server/analysis/health-score";
 import type { UncheckedReason } from "@/server/analysis/resolve-versions";
 import type { Severity } from "@/server/analysis/severity";
 import { minutesUntilRetry } from "../check/copy";
+import type { FilterKey, Filters } from "./filters";
 
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
@@ -112,7 +113,57 @@ export const reportCopy = {
     noneLabel: "None",
     highestSeverity: (severity: Severity) => `, highest ${severity}`,
     pending: "Checking…",
-    ready: (ready: number, total: number) => `${ready} of ${total} ready`,
+  },
+  // screens 5.5 toolbar and table states
+  toolbar: {
+    label: "Filter packages",
+    search: "Search packages…",
+    searchLabel: "Search packages",
+    searchShortcut: "/",
+    any: "Any",
+    clearAll: "Clear all",
+    removeFilter: (chip: string) => `Remove filter ${chip}`,
+    showing: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+    chip: (filter: string, value: string) => `${filter}: ${value}`,
+    filters: {
+      type: {
+        label: "Type",
+        values: { prod: "prod", dev: "dev" },
+      },
+      lag: {
+        label: "Behind",
+        values: {
+          current: "up to date",
+          patch: "patch",
+          minor: "minor",
+          major: "major",
+        },
+      },
+      vuln: {
+        label: "Vulnerabilities",
+        values: { yes: "vulnerable", no: "none" },
+      },
+      status: {
+        label: "Status",
+        values: {
+          active: "active",
+          stale: "stale",
+          deprecated: "deprecated",
+          unchecked: "not checked",
+        },
+      },
+    } satisfies {
+      [K in FilterKey]: {
+        label: string;
+        values: Record<NonNullable<Filters[K]>, string>;
+      };
+    },
+  },
+  empty: {
+    noMatches: "No packages match these filters.",
+    clearFilters: "Clear filters",
+    allUpToDate: (count: number) => `All ${count} packages are up to date.`,
+    saveToGetNotified: "Save project to get notified about new releases.",
   },
 };
 

@@ -89,7 +89,11 @@ export async function ReportView({
         ) : (
           <>
             {summary ? (
-              <ReportSummary score={summary.score} counts={summary.counts} />
+              <ReportSummary
+                score={summary.score}
+                counts={summary.counts}
+                basePath={basePath}
+              />
             ) : (
               <ReportSummarySkeleton />
             )}

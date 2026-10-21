@@ -5,6 +5,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { NuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { PackageRowJson } from "@/server/check/package-row";
@@ -43,6 +45,19 @@ const dependencies = [
   { name: "eslint", specifier: "^1.0.0", type: "dev" as const },
 ];
 
+const withUrl = (search = "", onUrlUpdate?: (event: UrlUpdateEvent) => void) =>
+  function UrlWrapper({ children }: { children: ReactNode }) {
+    return (
+      <NuqsTestingAdapter
+        searchParams={search}
+        onUrlUpdate={onUrlUpdate}
+        hasMemory
+      >
+        {children}
+      </NuqsTestingAdapter>
+    );
+  };
+
 const rowOf = (name: string) => {
   const cell = screen.getByText(name);
   const row = cell.closest("tr");
@@ -69,9 +84,10 @@ describe("DependencyTable", () => {
       >
         <DependencyTable />
       </ReportProvider>,
+      { wrapper: withUrl() },
     );
 
-    expect(screen.getByText("1 of 2 ready")).toBeInTheDocument();
+    expect(screen.getByText("Showing 2 of 2")).toBeInTheDocument();
     expect(rowOf("react")).not.toHaveAttribute("aria-busy");
     expect(rowOf("eslint")).toHaveAttribute("aria-busy", "true");
     expect(within(rowOf("eslint")).getByText("dev")).toBeInTheDocument();
@@ -83,7 +99,6 @@ describe("DependencyTable", () => {
       package: { ...result("eslint"), type: "dev" },
     });
 
-    expect(screen.getByText("2 of 2 ready")).toBeInTheDocument();
     expect(rowOf("eslint")).not.toHaveAttribute("aria-busy");
     expect(rowOf("eslint")).toHaveClass("animate-row-flash");
   });
@@ -136,7 +151,7 @@ describe("DependencyTable columns and sorting", () => {
     }),
   ];
 
-  const renderTable = () =>
+  const renderTable = (search = "") =>
     render(
       <TooltipProvider delayDuration={0}>
         <ReportProvider
@@ -157,6 +172,7 @@ describe("DependencyTable columns and sorting", () => {
           <DependencyTable />
         </ReportProvider>
       </TooltipProvider>,
+      { wrapper: withUrl(search) },
     );
 
   const order = () =>
@@ -272,5 +288,166 @@ describe("DependencyTable columns and sorting", () => {
 
     fireEvent.click(within(header("Released")).getByRole("button"));
     expect(order()[0]).toBe("next");
+  });
+});
+
+describe("DependencyTable filters in the URL", () => {
+  const rows: PackageRowJson[] = [
+    result("zod", { lagKind: "patch", latest: "1.0.1", lagMajors: null }),
+    result("next", { lagKind: "major", lagMajors: 2, latest: "3.0.0" }),
+    result("axios", {
+      lagKind: "minor",
+      latest: "1.2.0",
+      lagMajors: null,
+      vulnerabilities: [
+        {
+          ids: ["GHSA-1"],
+          primaryId: "GHSA-1",
+          severity: "high",
+          fixedIn: null,
+        },
+      ],
+    }),
+  ];
+
+  const renderTable = (
+    search = "",
+    onUrlUpdate?: (event: UrlUpdateEvent) => void,
+  ) =>
+    render(
+      <ReportProvider
+        checkId="c1"
+        running={false}
+        totalPackages={rows.length}
+        dependencies={rows.map((row) => ({
+          name: row.name,
+          specifier: "^1.0.0",
+          type: "prod" as const,
+        }))}
+        previousRows={[]}
+        currentRows={rows}
+      >
+        <DependencyTable />
+      </ReportProvider>,
+      { wrapper: withUrl(search, onUrlUpdate) },
+    );
+
+  const shownNames = () =>
+    screen
+      .queryAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelector("td .font-mono")?.textContent ?? "");
+  const lastQuery = (spy: ReturnType<typeof vi.fn>) =>
+    (spy.mock.lastCall?.[0] as UrlUpdateEvent | undefined)?.queryString;
+
+  it("opens with the filters and sort from the URL", () => {
+    renderTable("?vuln=no&sort=-behind");
+    expect(shownNames()).toEqual(["next", "zod"]);
+    expect(screen.getByText("Showing 2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Vulnerabilities: none")).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /^Behind/ }),
+    ).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("writes the sort to the URL", async () => {
+    const onUrlUpdate = vi.fn();
+    renderTable("", onUrlUpdate);
+    fireEvent.click(
+      within(screen.getByRole("columnheader", { name: /^Package/ })).getByRole(
+        "button",
+      ),
+    );
+    expect(shownNames()).toEqual(["axios", "next", "zod"]);
+    await waitFor(() => expect(lastQuery(onUrlUpdate)).toBe("?sort=name"));
+  });
+
+  it("applies a filter from its menu and removes it with the chip", async () => {
+    const onUrlUpdate = vi.fn();
+    renderTable("", onUrlUpdate);
+    const toolbar = within(
+      screen.getByRole("group", { name: "Filter packages" }),
+    );
+    fireEvent.keyDown(toolbar.getByRole("button", { name: "Behind" }), {
+      key: "Enter",
+    });
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "minor" }),
+    );
+
+    expect(shownNames()).toEqual(["axios"]);
+    await waitFor(() => expect(lastQuery(onUrlUpdate)).toBe("?lag=minor"));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove filter Behind: minor" }),
+    );
+    expect(shownNames()).toHaveLength(3);
+    await waitFor(() => expect(lastQuery(onUrlUpdate)).toBe(""));
+  });
+
+  it("searches after the typing delay", async () => {
+    const onUrlUpdate = vi.fn();
+    renderTable("", onUrlUpdate);
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search packages" }),
+      {
+        target: { value: "ax" },
+      },
+    );
+    expect(shownNames()).toHaveLength(3);
+    await waitFor(() => expect(shownNames()).toEqual(["axios"]));
+    await waitFor(() => expect(lastQuery(onUrlUpdate)).toBe("?q=ax"));
+  });
+
+  it("shows the no-matches state and clears every filter, keeping the sort", async () => {
+    const onUrlUpdate = vi.fn();
+    renderTable("?q=nothing&lag=major&sort=name", onUrlUpdate);
+    expect(
+      screen.getByText("No packages match these filters."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(shownNames()).toEqual(["axios", "next", "zod"]);
+    await waitFor(() => expect(lastQuery(onUrlUpdate)).toBe("?sort=name"));
+  });
+
+  it("focuses the search on / unless the user is already typing", () => {
+    renderTable();
+    const search = screen.getByRole("searchbox", { name: "Search packages" });
+
+    expect(fireEvent.keyDown(document.body, { key: "/" })).toBe(false);
+    expect(search).toHaveFocus();
+
+    // Not cancelled: the "/" goes into the field.
+    expect(fireEvent.keyDown(search, { key: "/" })).toBe(true);
+    expect(fireEvent.keyDown(document.body, { key: "/", ctrlKey: true })).toBe(
+      true,
+    );
+  });
+
+  it("says when every package is up to date", () => {
+    const current = (name: string) =>
+      result(name, { lagKind: "current", latest: "1.0.0", lagMajors: null });
+    render(
+      <ReportProvider
+        checkId="c1"
+        running={false}
+        totalPackages={2}
+        dependencies={dependencies}
+        previousRows={[]}
+        currentRows={[current("react"), current("eslint")]}
+      >
+        <DependencyTable saveHint />
+      </ReportProvider>,
+      { wrapper: withUrl() },
+    );
+    expect(
+      screen.getByText("All 2 packages are up to date."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Save project to get notified about new releases."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });
