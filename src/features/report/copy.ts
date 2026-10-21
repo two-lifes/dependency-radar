@@ -145,6 +145,9 @@ export const reportCopy = {
     clearAll: "Clear all",
     removeFilter: (chip: string) => `Remove filter ${chip}`,
     showing: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+    copyCommand: (count: number) => `Copy update command (${count})`,
+    copyCommandLabel: (count: number) =>
+      `Copy update command for ${plural(count, "shown package", "shown packages")}`,
     chip: (filter: string, value: string) => `${filter}: ${value}`,
     filters: {
       type: {

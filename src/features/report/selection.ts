@@ -30,15 +30,11 @@ export function headerState(
 }
 
 /**
- * spec 7.5 for the selection bar: one line, prod and dev commands joined with
- * `&&` so a single paste runs both. Rows that are up to date, pending or not
- * checked have nothing to update; null when no selected row does.
+ * What a copied command updates: checked rows behind the latest version.
+ * Rows that are up to date, pending or not checked have nothing to update.
  */
-export function selectionCommand(
-  rows: readonly ReportRow[],
-  manager: PackageManager,
-): string | null {
-  const targets = rows.flatMap((row): UpdateTarget[] => {
+export function updateTargets(rows: readonly ReportRow[]): UpdateTarget[] {
+  return rows.flatMap((row): UpdateTarget[] => {
     const result = row.result;
     if (
       !result?.checked ||
@@ -58,6 +54,17 @@ export function selectionCommand(
       },
     ];
   });
-  const commands = updateCommands(manager, targets);
+}
+
+/**
+ * spec 7.5 for the selection bar and the toolbar: one line, prod and dev
+ * commands joined with `&&` so a single paste runs both; null when no row
+ * has anything to update.
+ */
+export function selectionCommand(
+  rows: readonly ReportRow[],
+  manager: PackageManager,
+): string | null {
+  const commands = updateCommands(manager, updateTargets(rows));
   return commands.length > 0 ? commands.join(" && ") : null;
 }

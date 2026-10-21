@@ -4,6 +4,7 @@ import { Copy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { reportCopy } from "./copy";
+import { copyUpdateCommand } from "./copy-command";
 import { PackageManagerSwitch } from "./package-manager-switch";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
@@ -27,12 +28,7 @@ export function SelectionBar({
       toast({ title: copy.nothingToUpdate });
       return;
     }
-    try {
-      await navigator.clipboard.writeText(command);
-      toast({ title: copy.commandCopied, description: command });
-    } catch {
-      toast({ title: copy.copyFailed, description: command });
-    }
+    await copyUpdateCommand(command);
   };
 
   return (

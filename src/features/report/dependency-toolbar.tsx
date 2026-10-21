@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Copy, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { reportCopy } from "./copy";
+import { copyUpdateCommand } from "./copy-command";
 import {
   FILTER_KEYS,
   FILTER_VALUES,
@@ -26,21 +27,31 @@ import {
   type FilterKey,
   type Filters,
 } from "./filters";
+import { PackageManagerSwitch } from "./package-manager-switch";
+import { useReport } from "./report-context";
+import type { ReportRow } from "./report-rows";
+import { selectionCommand, updateTargets } from "./selection";
 import type { ReportFilters } from "./use-report-filters";
 
 const copy = reportCopy.toolbar;
 
-/** screens 5.5: search, filter menus, chips and the "Showing" counter. */
+/**
+ * screens 5.5: search, filter menus, chips and the "Showing" counter, plus
+ * the update command for the shown rows (decisions 39).
+ */
 export function DependencyToolbar({
   state,
   shown,
   total,
 }: {
   state: ReportFilters;
-  shown: number;
+  /** The rows after the filters and the search. */
+  shown: readonly ReportRow[];
   total: number;
 }) {
   const { filters, setFilters, setQuery, clear } = state;
+  const { packageManager } = useReport();
+  const updatable = updateTargets(shown).length;
   const searchRef = useFocusOnSlash();
   // One typed setter per key: a computed `{ [key]: value }` loses the types.
   const setters: { [K in FilterKey]: (value: Filters[K]) => void } = {
@@ -98,8 +109,26 @@ export function DependencyToolbar({
           aria-live="polite"
           className="ml-auto text-sm text-muted-foreground tabular-nums"
         >
-          {copy.showing(shown, total)}
+          {copy.showing(shown.length, total)}
         </p>
+        {/* Its own row on phones, next to "Showing" from md up. */}
+        {updatable > 0 ? (
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={copy.copyCommandLabel(updatable)}
+              onClick={() => {
+                const command = selectionCommand(shown, packageManager);
+                if (command !== null) void copyUpdateCommand(command);
+              }}
+            >
+              <Copy aria-hidden />
+              {copy.copyCommand(updatable)}
+            </Button>
+            <PackageManagerSwitch />
+          </div>
+        ) : null}
       </div>
       {hasActiveFilters(filters) ? (
         <ul className="flex flex-wrap items-center gap-2">

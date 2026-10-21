@@ -238,7 +238,7 @@ export function DependencyTable({
         ) : (
           <DependencyToolbar
             state={filterState}
-            shown={data.length}
+            shown={data}
             total={rows.length}
           />
         )}

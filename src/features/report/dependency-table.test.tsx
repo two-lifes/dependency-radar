@@ -580,6 +580,46 @@ describe("DependencyTable selection", () => {
     expect(screen.getByRole("radio", { name: "pnpm" })).toBeChecked();
   });
 
+  it("copies the command for every shown package from the toolbar", async () => {
+    renderTable("", "pnpm");
+    const toolbar = within(
+      screen.getByRole("group", { name: "Filter packages" }),
+    );
+    const button = toolbar.getByRole("button", {
+      name: "Copy update command for 3 shown packages",
+    });
+    expect(button).toHaveTextContent("Copy update command (3)");
+    expect(
+      toolbar.getByRole("radiogroup", { name: "Package manager" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        "pnpm add next@3.0.0 zod@1.0.1 && pnpm add -D vitest@1.2.0",
+      ),
+    );
+  });
+
+  it("limits the toolbar command to the filtered rows", async () => {
+    renderTable("?type=prod");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Copy update command for 2 shown packages",
+      }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("npm i next@3.0.0 zod@1.0.1"),
+    );
+  });
+
+  it("has no toolbar command when nothing shown needs an update", () => {
+    renderTable("?q=nothing-like-this");
+    expect(
+      screen.queryByRole("button", { name: /^Copy update command for/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("selects from the mobile cards too", () => {
     renderTable();
     const cards = within(screen.getByRole("list", { name: "Packages" }));
