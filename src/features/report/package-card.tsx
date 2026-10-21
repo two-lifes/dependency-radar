@@ -94,10 +94,10 @@ export function PackageCard() {
     }
     const names = orderedRows(rows, filters).map((r) => r.name);
     const index = names.indexOf(row.name);
-    // A package hidden by the filters (opened from Vulnerabilities): `j`
-    // starts from the top of the table.
+    // `k` is next, `j` previous (decisions 38). A package hidden by the
+    // filters (opened from Vulnerabilities): `k` starts from the top.
     const next =
-      event.key === "j"
+      event.key === "k"
         ? names[index + 1]
         : index > 0
           ? names[index - 1]

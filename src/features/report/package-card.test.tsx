@@ -401,12 +401,15 @@ describe("PackageCard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("names the j, k and Esc shortcuts even without a footer action", () => {
+  it("names the k, j and Esc shortcuts even without a footer action", () => {
     renderCard("?pkg=zod", { guest: false });
     const card = within(dialog());
-    expect(card.getByText("j", { selector: "kbd" })).toBeInTheDocument();
-    expect(card.getByText("k", { selector: "kbd" })).toBeInTheDocument();
-    expect(card.getByText("Esc", { selector: "kbd" })).toBeInTheDocument();
+    // Next first: "k j next / previous".
+    expect(
+      card
+        .getAllByText(/^(k|j|Esc)$/, { selector: "kbd" })
+        .map((key) => key.textContent),
+    ).toEqual(["k", "j", "Esc"]);
     expect(card.getByText("next / previous ·")).toBeInTheDocument();
   });
 
@@ -454,41 +457,41 @@ describe("PackageCard", () => {
     expect(onUrlUpdate.mock.lastCall?.[0].options.history).toBe("replace");
   });
 
-  it("moves through packages in the table's order with j and k", async () => {
+  it("moves through packages in the table's order with k (next) and j (previous)", async () => {
     const onUrlUpdate = vi.fn();
     renderCard("?pkg=lodash", { onUrlUpdate });
 
-    fireEvent.keyDown(dialog(), { key: "j" });
+    fireEvent.keyDown(dialog(), { key: "k" });
     await waitFor(() => expect(lastPkg(onUrlUpdate)).toBe("react"));
     expect(onUrlUpdate.mock.lastCall?.[0].options.history).toBe("replace");
     expect(
       within(dialog()).getByRole("heading", { name: "react" }),
     ).toBeInTheDocument();
 
-    fireEvent.keyDown(dialog(), { key: "k" });
+    fireEvent.keyDown(dialog(), { key: "j" });
     await waitFor(() => expect(lastPkg(onUrlUpdate)).toBe("lodash"));
 
     // lodash is first: nothing before it.
     onUrlUpdate.mockClear();
-    fireEvent.keyDown(dialog(), { key: "k" });
-    fireEvent.keyDown(dialog(), { key: "j", ctrlKey: true });
+    fireEvent.keyDown(dialog(), { key: "j" });
+    fireEvent.keyDown(dialog(), { key: "k", ctrlKey: true });
     expect(onUrlUpdate).not.toHaveBeenCalled();
   });
 
   it("follows the sort in the URL", async () => {
     const onUrlUpdate = vi.fn();
     renderCard("?sort=name&pkg=lodash", { onUrlUpdate });
-    fireEvent.keyDown(dialog(), { key: "j" });
+    fireEvent.keyDown(dialog(), { key: "k" });
     await waitFor(() => expect(lastPkg(onUrlUpdate)).toBe("react"));
-    fireEvent.keyDown(dialog(), { key: "k" });
-    fireEvent.keyDown(dialog(), { key: "k" });
+    fireEvent.keyDown(dialog(), { key: "j" });
+    fireEvent.keyDown(dialog(), { key: "j" });
     await waitFor(() => expect(lastPkg(onUrlUpdate)).toBe("local-lib"));
   });
 
   it("closes on Esc and returns focus to the package's row", async () => {
     const onUrlUpdate = vi.fn();
     renderCard("?pkg=lodash", { onUrlUpdate });
-    fireEvent.keyDown(dialog(), { key: "j" });
+    fireEvent.keyDown(dialog(), { key: "k" });
     await waitFor(() => expect(lastPkg(onUrlUpdate)).toBe("react"));
 
     fireEvent.keyDown(dialog(), { key: "Escape" });
