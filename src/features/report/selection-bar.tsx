@@ -4,6 +4,7 @@ import { Copy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { reportCopy } from "./copy";
+import { PackageManagerSwitch } from "./package-manager-switch";
 import { useReport } from "./report-context";
 import type { ReportRow } from "./report-rows";
 import { selectionCommand } from "./selection";
@@ -47,6 +48,7 @@ export function SelectionBar({
         <Copy aria-hidden />
         {copy.copyCommand}
       </Button>
+      <PackageManagerSwitch />
       <Button variant="ghost" size="sm" onClick={onClear}>
         <X aria-hidden />
         {copy.clear}

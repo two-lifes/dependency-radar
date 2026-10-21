@@ -159,7 +159,10 @@ describe("PackageCard", () => {
       configurable: true,
     });
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+  });
 
   it("opens from ?pkg with the stored versions and the loaded details", async () => {
     renderCard("?pkg=lodash");
@@ -224,10 +227,30 @@ describe("PackageCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("copies the command for the manager picked in the switch", async () => {
+    renderCard("?pkg=lodash");
+    const switcher = within(
+      within(dialog()).getByRole("radiogroup", { name: "Package manager" }),
+    );
+    expect(switcher.getByRole("radio", { name: "npm" })).toBeChecked();
+
+    fireEvent.click(switcher.getByRole("radio", { name: "yarn" }));
+    expect(switcher.getByRole("radio", { name: "yarn" })).toBeChecked();
+    fireEvent.click(
+      within(dialog()).getByRole("button", { name: "Copy update command" }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("yarn add lodash@4.17.21"),
+    );
+  });
+
   it("has no command for an up-to-date package and no hint for a project", () => {
     renderCard("?pkg=zod", { guest: false });
     expect(
       within(dialog()).queryByRole("button", { name: "Copy update command" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog()).queryByRole("radiogroup", { name: "Package manager" }),
     ).not.toBeInTheDocument();
     expect(
       within(dialog()).queryByText("Save project to snooze or plan updates"),

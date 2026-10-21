@@ -17,6 +17,8 @@ export const reportCopy = {
   },
   checked: "Checked",
   checking: "Checking…",
+  // spec 7.5: next to every "Copy update command"
+  packageManager: "Package manager",
   expiresOn: (date: string) =>
     `This report is public via link and expires on ${date}.`,
   actions: {

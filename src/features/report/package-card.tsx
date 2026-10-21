@@ -33,6 +33,7 @@ import type { Result } from "@/server/analysis/result";
 import type { PackageDetails } from "@/server/check/package-details";
 import type { PackageRowJson } from "@/server/check/package-row";
 import { reportCopy, uncheckedReasonCopy } from "./copy";
+import { PackageManagerSwitch } from "./package-manager-switch";
 import { filterParsers } from "./filters";
 import { getPackageDetails, type PackageDetailsError } from "./package-actions";
 import { ReleaseTimeline } from "./release-timeline";
@@ -220,10 +221,13 @@ function PackagePanel({ row }: { row: ReportRow }) {
         )}
       >
         {command !== null ? (
-          <Button variant="secondary" size="sm" onClick={onCopy}>
-            <Copy aria-hidden />
-            {copy.copyCommand}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={onCopy}>
+              <Copy aria-hidden />
+              {copy.copyCommand}
+            </Button>
+            <PackageManagerSwitch />
+          </div>
         ) : null}
         {guest ? (
           <p className="text-sm text-muted-foreground">{copy.guestHint}</p>

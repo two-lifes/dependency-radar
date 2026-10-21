@@ -486,6 +486,7 @@ describe("DependencyTable selection", () => {
       configurable: true,
     });
   });
+  afterEach(() => window.localStorage.clear());
 
   const renderTable = (search = "", manager: "npm" | "pnpm" = "npm") =>
     render(
@@ -553,6 +554,30 @@ describe("DependencyTable selection", () => {
         "pnpm add next@3.0.0 zod@1.0.1 && pnpm add -D vitest@1.2.0",
       ),
     );
+  });
+
+  it("copies with the manager picked next to the button and keeps it", async () => {
+    const { unmount } = renderTable("", "npm");
+    fireEvent.click(selectAll());
+    const switcher = within(
+      screen.getByRole("radiogroup", { name: "Package manager" }),
+    );
+    expect(switcher.getByRole("radio", { name: "npm" })).toBeChecked();
+
+    fireEvent.click(switcher.getByRole("radio", { name: "pnpm" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy update command" }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        "pnpm add next@3.0.0 zod@1.0.1 && pnpm add -D vitest@1.2.0",
+      ),
+    );
+
+    unmount();
+    renderTable("", "npm");
+    fireEvent.click(selectAll());
+    expect(screen.getByRole("radio", { name: "pnpm" })).toBeChecked();
   });
 
   it("selects from the mobile cards too", () => {

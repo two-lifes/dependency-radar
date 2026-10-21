@@ -5,6 +5,7 @@ import { createContext, type ReactNode, use, useMemo } from "react";
 import type { ManifestDependency } from "@/server/analysis/parse-manifest";
 import type { PackageManager } from "@/server/analysis/update-command";
 import type { PackageRowJson } from "@/server/check/package-row";
+import { usePackageManager } from "./package-manager-preference";
 import { buildRows, type ReportRow, type StreamState } from "./report-rows";
 import { useCheckStream } from "./use-check-stream";
 
@@ -14,7 +15,9 @@ type ReportContextValue = {
   guest: boolean;
   checkId: string | undefined;
   running: boolean;
+  /** The user's pick for this report, else the one detected from the repo. */
   packageManager: PackageManager;
+  setPackageManager: (manager: PackageManager) => void;
   rows: ReportRow[];
   stream: StreamState;
   retryStream: () => void;
@@ -52,6 +55,10 @@ export function ReportProvider({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const [chosenManager, setPackageManager] = usePackageManager(
+    reportId,
+    packageManager,
+  );
   const { state, retry, close } = useCheckStream({
     checkId: checkId ?? "",
     running: running && checkId !== undefined,
@@ -83,7 +90,8 @@ export function ReportProvider({
         guest,
         checkId,
         running,
-        packageManager,
+        packageManager: chosenManager,
+        setPackageManager,
         rows,
         stream: state,
         retryStream: retry,
