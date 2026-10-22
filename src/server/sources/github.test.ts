@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { http, HttpResponse } from "msw/http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchReleases, fetchRepoSource, GITHUB_API_URL } from "./github";
+import {
+  fetchGithubLogin,
+  fetchReleases,
+  fetchRepoSource,
+  GITHUB_API_URL,
+} from "./github";
 import { createLimiter } from "./limiter";
 import { createMemoryCache } from "./test/memory-cache";
 import { setupMswServer } from "./test/msw-server";
@@ -303,5 +308,74 @@ describe("fetchReleases", () => {
       error: { code: "not-found" },
     });
     expect(entries.size).toBe(0);
+  });
+});
+
+describe("fetchGithubLogin", () => {
+  const userUrl = `${GITHUB_API_URL}/user/583231`;
+
+  it("reads the login by the account id and caches it", async () => {
+    const calls = { count: 0 };
+    let auth: string | null = null;
+    server.use(
+      http.get(userUrl, ({ request }) => {
+        calls.count += 1;
+        auth = request.headers.get("authorization");
+        return HttpResponse.json({ login: "octocat", id: 583231 });
+      }),
+    );
+    const { cache, entries } = createMemoryCache();
+    const client = { cache, token: "t0ken", http: http0 };
+
+    const result = await fetchGithubLogin("583231", client);
+    const again = await fetchGithubLogin("583231", client);
+
+    expect(result).toEqual({ ok: true, value: "octocat" });
+    expect(again).toEqual({ ok: true, value: "octocat" });
+    expect(calls.count).toBe(1);
+    expect(auth).toBe("Bearer t0ken");
+    expect([...entries.keys()]).toEqual(["github:user:583231"]);
+  });
+
+  it("returns not-found for a deleted user and caches nothing", async () => {
+    server.use(
+      http.get(userUrl, () => new HttpResponse(null, { status: 404 })),
+    );
+    const { cache, entries } = createMemoryCache();
+
+    expect(await fetchGithubLogin("583231", { cache, http: http0 })).toEqual({
+      ok: false,
+      error: { code: "not-found" },
+    });
+    expect(entries.size).toBe(0);
+  });
+
+  it("reports the GitHub rate limit", async () => {
+    server.use(
+      http.get(
+        userUrl,
+        () =>
+          new HttpResponse(null, {
+            status: 429,
+            headers: { "retry-after": "120" },
+          }),
+      ),
+    );
+    const { cache } = createMemoryCache();
+
+    expect(await fetchGithubLogin("583231", { cache, http: http0 })).toEqual({
+      ok: false,
+      error: { code: "rate-limited", retryAfterSeconds: 120 },
+    });
+  });
+
+  it("rejects an answer without a login", async () => {
+    server.use(http.get(userUrl, () => HttpResponse.json({ id: 583231 })));
+    const { cache } = createMemoryCache();
+
+    expect(await fetchGithubLogin("583231", { cache, http: http0 })).toEqual({
+      ok: false,
+      error: { code: "invalid-response" },
+    });
   });
 });

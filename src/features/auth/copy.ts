@@ -46,9 +46,4 @@ export const authCopy = {
     themes: { light: "Light", dark: "Dark", system: "System" },
     signOut: "Sign out",
   },
-  stub: {
-    projectSettings: "Project settings",
-    profile: "Profile",
-    soon: "Coming soon.",
-  },
 } as const;

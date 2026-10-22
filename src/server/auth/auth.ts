@@ -33,6 +33,11 @@ function createAuth() {
             },
           }
         : {},
+    // "Connect GitHub" in the profile (decisions 47): a magic-link user's
+    // GitHub email often differs. Only explicit linking is affected.
+    account: { accountLinking: { allowDifferentEmails: true } },
+    // "Delete account" requires a session younger than a day (freshAge).
+    user: { deleteUser: { enabled: true } },
     plugins: [
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,

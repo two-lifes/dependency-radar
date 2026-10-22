@@ -166,6 +166,31 @@ export function fetchReleases(
   );
 }
 
+const userSchema = z.object({ login: z.string().min(1) });
+
+/**
+ * The current login of a GitHub user by the numeric id Better Auth stores
+ * (decisions 47): the id survives a rename, the login doesn't.
+ */
+export function fetchGithubLogin(
+  accountId: string,
+  options: GithubClientOptions & { cache: Cache },
+): Promise<Result<string, SourceError>> {
+  return withCache(
+    options.cache,
+    `github:user:${accountId}`,
+    z.string(),
+    async () => {
+      const result = await fetchJson(
+        `${GITHUB_API_URL}/user/${encodeURIComponent(accountId)}`,
+        userSchema,
+        request(options),
+      );
+      return result.ok ? { ok: true, value: result.value.login } : result;
+    },
+  );
+}
+
 const JSON_MEDIA = "application/vnd.github+json";
 const RAW = "application/vnd.github.raw+json";
 
