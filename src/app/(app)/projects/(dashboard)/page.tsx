@@ -16,7 +16,10 @@ export default async function ProjectsPage() {
   ]);
   const githubConnected = githubAccountId !== undefined;
   return (
-    <ProjectsLayout githubConnected={githubConnected}>
+    <ProjectsLayout
+      githubConnected={githubConnected}
+      actions={projects.length > 0}
+    >
       {projects.length === 0 ? (
         <EmptyProjects githubConnected={githubConnected} />
       ) : (

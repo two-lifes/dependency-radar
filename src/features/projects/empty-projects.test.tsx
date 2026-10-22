@@ -44,4 +44,16 @@ describe("ProjectsLayout", () => {
       screen.getByRole("link", { name: "New project" }),
     ).toBeInTheDocument();
   });
+
+  it("leaves the actions to the empty state when asked", () => {
+    render(
+      <ProjectsLayout githubConnected actions={false}>
+        content
+      </ProjectsLayout>,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Projects" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
 });

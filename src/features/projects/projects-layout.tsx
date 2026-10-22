@@ -6,14 +6,17 @@ import { projectsCopy } from "./copy";
 
 /**
  * screens 5.10, item 1: the title, "Import from GitHub" (with GitHub
- * connected) and "New project" over every state. Loading and error don't know
- * the connection yet, so they show "New project" only.
+ * connected) and "New project". Loading and error don't know the connection
+ * yet, so they show "New project" only. With no projects the empty state
+ * carries the actions, so the header has none: one primary action per screen.
  */
 export function ProjectsLayout({
   githubConnected = false,
+  actions = true,
   children,
 }: {
   githubConnected?: boolean;
+  actions?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -22,22 +25,24 @@ export function ProjectsLayout({
         <h1 className="text-xl font-semibold tracking-tight">
           {projectsCopy.title}
         </h1>
-        <div className="flex flex-wrap gap-2">
-          {githubConnected ? (
-            <Button asChild variant="secondary">
-              <Link href="/projects/new?source=github">
-                <GitBranch aria-hidden />
-                {projectsCopy.importFromGithub}
+        {actions ? (
+          <div className="flex flex-wrap gap-2">
+            {githubConnected ? (
+              <Button asChild variant="secondary">
+                <Link href="/projects/new?source=github">
+                  <GitBranch aria-hidden />
+                  {projectsCopy.importFromGithub}
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild>
+              <Link href="/projects/new">
+                <Plus aria-hidden />
+                {projectsCopy.newProject}
               </Link>
             </Button>
-          ) : null}
-          <Button asChild>
-            <Link href="/projects/new">
-              <Plus aria-hidden />
-              {projectsCopy.newProject}
-            </Link>
-          </Button>
-        </div>
+          </div>
+        ) : null}
       </div>
       {children}
     </main>
