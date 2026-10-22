@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { type ReactNode, Suspense } from "react";
 import { z } from "zod";
-import { GuestHeader } from "@/components/guest-header";
+import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { reportCopy } from "@/features/report/copy";
 import { ReportSkeleton } from "@/features/report/report-skeleton";
@@ -15,7 +15,10 @@ import { getReportMeta } from "@/server/db/report-page";
 
 const idSchema = z.uuid();
 
-/** screens 5.4: guest report, shared by the Dependencies and Vulnerabilities tabs. */
+/**
+ * screens 5.4: guest report, shared by the Dependencies and Vulnerabilities
+ * tabs. A signed-in user sees the same report with the app header (screens 1.4).
+ */
 export default async function GuestReportLayout({
   children,
   params,
@@ -33,7 +36,7 @@ export default async function GuestReportLayout({
     const copy = reportCopy.expired;
     return (
       <>
-        <GuestHeader />
+        <SiteHeader />
         <SystemMessage
           icon={<Clock />}
           title={copy.title}
@@ -49,7 +52,7 @@ export default async function GuestReportLayout({
 
   return (
     <>
-      <GuestHeader />
+      <SiteHeader />
       <Suspense fallback={<ReportSkeleton />}>
         <ReportView reportId={id}>{children}</ReportView>
       </Suspense>

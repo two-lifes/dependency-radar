@@ -3,9 +3,24 @@ import { describe, expect, it, vi } from "vitest";
 import ErrorPage from "./error";
 import NotFound from "./not-found";
 
+const getOptionalSession = vi.hoisted(() => vi.fn());
+vi.mock("@/server/auth/session", () => ({ getOptionalSession }));
+
 describe("404 page", () => {
-  it("explains and links home", () => {
-    render(<NotFound />);
+  it("links a signed-in user to projects", async () => {
+    getOptionalSession.mockResolvedValue({ user: { id: "u1" } });
+    render(await NotFound());
+    expect(
+      screen.getByRole("link", { name: "Go to projects" }),
+    ).toHaveAttribute("href", "/projects");
+    expect(
+      screen.queryByRole("link", { name: "Go home" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains and links a guest home", async () => {
+    getOptionalSession.mockResolvedValue(null);
+    render(await NotFound());
     expect(
       screen.getByRole("heading", { level: 1, name: "Page not found" }),
     ).toBeInTheDocument();

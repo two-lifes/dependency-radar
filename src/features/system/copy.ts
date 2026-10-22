@@ -5,6 +5,7 @@ export const systemCopy = {
     description:
       "The page you're looking for doesn't exist or you don't have access.",
     goHome: "Go home",
+    goToProjects: "Go to projects",
   },
   error: {
     title: "Something went wrong",

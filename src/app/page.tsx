@@ -6,12 +6,14 @@ import { startGuestCheck } from "@/features/landing/actions";
 import { CheckForm } from "@/features/landing/check-form";
 import { landingCopy as copy } from "@/features/landing/copy";
 import { RadarIllustration } from "@/features/landing/radar-illustration";
+import { getOptionalSession } from "@/server/auth/session";
 
 /** screens 5.1 */
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await getOptionalSession();
   return (
     <>
-      <GuestHeader />
+      <GuestHeader signedIn={session !== null} />
       <main>
         <section className="mx-auto grid max-w-180 gap-8 px-4 pt-16 pb-16 sm:px-6 sm:pt-24 sm:pb-24">
           <div className="grid gap-4 text-center">

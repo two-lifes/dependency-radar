@@ -3,10 +3,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { systemCopy } from "@/features/system/copy";
 import { SystemMessage } from "@/features/system/system-message";
+import { getOptionalSession } from "@/server/auth/session";
 
-// "Go to projects" for signed-in users comes with auth (plan task 20).
-export default function NotFound() {
+/** screens 5.16: "Go to projects" once signed in, "Go home" for a guest. */
+export default async function NotFound() {
   const copy = systemCopy.notFound;
+  const signedIn = (await getOptionalSession()) !== null;
   return (
     <SystemMessage
       icon={<FileQuestionIcon aria-hidden="true" />}
@@ -14,7 +16,11 @@ export default function NotFound() {
       description={copy.description}
     >
       <Button asChild>
-        <Link href="/">{copy.goHome}</Link>
+        {signedIn ? (
+          <Link href="/projects">{copy.goToProjects}</Link>
+        ) : (
+          <Link href="/">{copy.goHome}</Link>
+        )}
       </Button>
     </SystemMessage>
   );

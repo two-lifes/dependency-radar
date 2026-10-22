@@ -4,6 +4,7 @@ export const landingCopy = {
     home: "Dependency Radar home",
     tryDemo: "Try demo",
     signIn: "Sign in",
+    dashboard: "Dashboard",
     menu: "Open menu",
   },
   hero: {

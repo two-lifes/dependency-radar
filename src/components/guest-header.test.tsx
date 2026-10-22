@@ -21,4 +21,19 @@ describe("GuestHeader", () => {
       screen.getByRole("button", { name: "Open menu" }),
     ).toBeInTheDocument();
   });
+
+  it("shows Dashboard instead of the guest actions once signed in", () => {
+    render(<GuestHeader signedIn />);
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
+      "href",
+      "/projects",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Sign in" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Try demo" }),
+    ).not.toBeInTheDocument();
+  });
 });
