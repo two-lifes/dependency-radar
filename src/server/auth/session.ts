@@ -1,12 +1,18 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { loginPath, safeNext } from "@/lib/safe-next";
+import type { Viewer } from "../analysis/project-access";
 import { type Auth, getAuth } from "./auth";
 import { REQUEST_PATH_HEADER } from "./session-header";
 
 export type Session = NonNullable<
   Awaited<ReturnType<Auth["api"]["getSession"]>>
 >;
+
+/** The session's own id, read from the cookie (plan.md 26.1). */
+export function viewerOf(session: Session): Viewer {
+  return { userId: session.user.id, sessionId: session.session.id };
+}
 
 export async function getSession(): Promise<Session | null> {
   // headers() first: at build time it stops prerendering before Better Auth

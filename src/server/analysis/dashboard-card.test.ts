@@ -17,6 +17,7 @@ function project(
     name: "shop",
     source: "paste",
     repoUrl: null,
+    editable: true,
     latest,
     result,
   };

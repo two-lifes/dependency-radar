@@ -9,6 +9,11 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@/server/auth/session", () => ({
   getOptionalSession: async () => state.session,
+  // The real one only reads two fields; every mocked session is "s1".
+  viewerOf: ({ user }: { user: { id: string } }) => ({
+    userId: user.id,
+    sessionId: "s1",
+  }),
 }));
 vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
 const projects = vi.hoisted(() => ({ saveGuestReport: vi.fn() }));
@@ -56,7 +61,7 @@ describe("GET /r/[id]/save", () => {
     expect(projects.saveGuestReport).toHaveBeenCalledWith(
       expect.anything(),
       REPORT_ID,
-      "u1",
+      { userId: "u1", sessionId: "s1" },
     );
   });
 

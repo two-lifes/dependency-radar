@@ -10,6 +10,7 @@ const project: DashboardProject = {
   name: "shop-frontend",
   source: "github",
   repoUrl: "https://github.com/acme/shop-frontend",
+  editable: true,
   latest: null,
   result: {
     score: 45,
@@ -117,16 +118,15 @@ describe("ProjectCard", () => {
     );
   });
 
-  it("disables Delete in the demo and says why", async () => {
+  it("disables Delete on a seeded demo project and says why", async () => {
     const onDelete = vi.fn();
     render(
       <TooltipProvider>
         <ProjectCard
-          project={project}
+          project={{ ...project, editable: false }}
           status={{ kind: "checked", at: new Date() }}
           onCheckNow={vi.fn()}
           onDelete={onDelete}
-          demo
         />
       </TooltipProvider>,
     );

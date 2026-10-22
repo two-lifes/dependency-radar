@@ -136,10 +136,21 @@ export const projects = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    /**
+     * Demo only (plan.md 26.1): the session that created the project, the
+     * only one that sees and changes it. Null for the seeded demo projects,
+     * which every demo session sees read-only, and for everyone else.
+     */
+    demoSessionId: text("demo_session_id").references(() => session.id, {
+      onDelete: "cascade",
+    }),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
   },
-  (t) => [index("projects_owner_id_idx").on(t.ownerId)],
+  (t) => [
+    index("projects_owner_id_idx").on(t.ownerId),
+    index("projects_demo_session_id_idx").on(t.demoSessionId),
+  ],
 );
 
 export const reports = pgTable(

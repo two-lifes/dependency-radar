@@ -5,6 +5,7 @@ import {
   startTransition,
   useActionState,
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -21,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { githubErrorCopy } from "../check/copy";
+import { DemoHint } from "../demo/demo-hint";
 import type { CheckSource } from "../landing/check-form-state";
 import { landingCopy } from "../landing/copy";
 import {
@@ -50,13 +52,17 @@ export function SourceSection({
   projectId,
   source,
   repoUrl,
+  demo = false,
 }: {
   projectId: string;
   source: CheckSource;
   repoUrl: string | null;
+  /** A seeded demo project is shared by every visitor (plan.md 26.1). */
+  demo?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const replaceRef = useRef<HTMLButtonElement>(null);
+  const hintId = useId();
 
   return (
     <SettingsSection title={copy.title}>
@@ -71,14 +77,17 @@ export function SourceSection({
           }}
         />
       ) : (
-        <div>
+        <div className="grid justify-items-start gap-2">
           <Button
             ref={replaceRef}
             variant="secondary"
+            disabled={demo}
+            aria-describedby={demo ? hintId : undefined}
             onClick={() => setEditing(true)}
           >
             {copy.replace}
           </Button>
+          {demo ? <DemoHint id={hintId} /> : null}
         </div>
       )}
     </SettingsSection>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ReportInput } from "@/server/analysis/report-input";
 import type { Result } from "@/server/analysis/result";
-import { requireSession } from "@/server/auth/session";
+import { requireSession, viewerOf } from "@/server/auth/session";
 import { resumeCheck, startCheck } from "@/server/check/check-control";
 import { getGithubAccountId } from "@/server/db/accounts";
 import { createPgCheckStore } from "@/server/db/check-store";
@@ -18,7 +18,6 @@ import {
   listProjectRepos,
   renameProject as renameProjectInDb,
 } from "@/server/db/projects";
-import { isDemoUser } from "@/server/demo/demo-user";
 import { consumeCheck } from "@/server/rate-limit";
 import { createPgCache } from "@/server/sources/cache";
 import {
@@ -77,7 +76,7 @@ export async function createProject(
   formData: FormData,
 ): Promise<NewProjectState> {
   const attempt = state.attempt + 1;
-  const { user } = await requireSession();
+  const session = await requireSession();
   const parsed = formSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const nameIssue = parsed.error.issues.find((i) => i.path[0] === "name");
@@ -115,7 +114,7 @@ export async function createProject(
   try {
     ({ projectId } = await createProjectWithCheck(
       getDb(),
-      user.id,
+      viewerOf(session),
       name,
       report,
     ));
@@ -137,9 +136,9 @@ export async function createProject(
 export async function loadGithubRepos(): Promise<
   Result<GithubRepoList, SourceError>
 > {
-  const { user } = await requireSession();
+  const session = await requireSession();
   const db = getDb();
-  const accountId = await getGithubAccountId(db, user.id);
+  const accountId = await getGithubAccountId(db, session.user.id);
   // Disconnected in another tab since the page was rendered.
   if (!accountId) return { ok: false, error: { code: "unavailable" } };
 
@@ -148,7 +147,7 @@ export async function loadGithubRepos(): Promise<
   if (!login.ok) return login;
   const [repos, projects] = await Promise.all([
     fetchGithubUserRepos(login.value, client),
-    listProjectRepos(db, user.id),
+    listProjectRepos(db, viewerOf(session)),
   ]);
   if (!repos.ok) return repos;
   return {
@@ -179,9 +178,9 @@ export async function queueCheck(
   fresh: boolean,
 ): Promise<QueueCheckResult> {
   if (!idSchema.safeParse(projectId).success) return { kind: "skipped" };
-  const { user } = await requireSession();
+  const session = await requireSession();
   const db = getDb();
-  const project = await getProjectCheckState(db, projectId, user.id);
+  const project = await getProjectCheckState(db, projectId, viewerOf(session));
   if (!project) return { kind: "skipped" };
   const { latest } = project;
   if (latest?.status === "running") {
@@ -217,15 +216,16 @@ export async function queueCheck(
     : { kind: "skipped" };
 }
 
-/** "Delete" from the card menu, after the name is typed in (screens 6). */
+/**
+ * "Delete" from the card menu, after the name is typed in (screens 6). A
+ * demo session deletes only its own projects: `deleteProject` decides in SQL.
+ */
 export async function removeProject(
   projectId: string,
 ): Promise<{ ok: boolean }> {
   if (!idSchema.safeParse(projectId).success) return { ok: false };
-  const { user } = await requireSession();
-  // The UI disables it; this stops a direct call (plan.md 25).
-  if (isDemoUser(user.id)) return { ok: false };
-  const ok = await deleteProject(getDb(), projectId, user.id);
+  const session = await requireSession();
+  const ok = await deleteProject(getDb(), projectId, viewerOf(session));
   refresh();
   return { ok };
 }
@@ -244,11 +244,11 @@ export async function renameProject(
   if (!idSchema.safeParse(projectId).success) {
     return { error: projectSettingsCopy.general.failed };
   }
-  const { user } = await requireSession();
+  const session = await requireSession();
   const renamed = await renameProjectInDb(
     getDb(),
     projectId,
-    user.id,
+    viewerOf(session),
     parsed.data,
   );
   if (!renamed) return { error: projectSettingsCopy.general.failed };
@@ -268,14 +268,15 @@ export async function replaceSource(
   formData: FormData,
 ): Promise<ReplaceSourceState> {
   const attempt = state.attempt + 1;
-  const { user } = await requireSession();
+  const session = await requireSession();
   const parsed = sourceSchema.safeParse(Object.fromEntries(formData));
   const db = getDb();
   const project = idSchema.safeParse(projectId).success
-    ? await getProjectSettings(db, projectId, user.id)
+    ? await getProjectSettings(db, projectId, viewerOf(session))
     : undefined;
-  if (!parsed.success || !project) {
-    // The form only sends valid fields for its own project.
+  if (!parsed.success || !project?.editable) {
+    // The form only sends valid fields for its own project, and a seeded
+    // demo project has no form (plan.md 26.1).
     return {
       attempt,
       error: { field: "paste", message: landingCopy.errors.generic },

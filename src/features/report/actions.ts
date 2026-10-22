@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { loginPath } from "@/lib/safe-next";
 import type { ReportInput } from "@/server/analysis/report-input";
-import { getOptionalSession } from "@/server/auth/session";
+import { getOptionalSession, viewerOf } from "@/server/auth/session";
 import {
   cancelCheck,
   resumeCheck,
@@ -111,6 +111,6 @@ export async function saveReport(reportId: string): Promise<void> {
   if (!idSchema.safeParse(reportId).success) return;
   const session = await getOptionalSession();
   if (!session) redirect(loginPath(`/r/${reportId}/save`));
-  const outcome = await saveGuestReport(getDb(), reportId, session.user.id);
+  const outcome = await saveGuestReport(getDb(), reportId, viewerOf(session));
   redirect(savedReportPath(reportId, outcome));
 }

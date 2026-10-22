@@ -1,18 +1,18 @@
 import { EmptyProjects } from "@/features/projects/empty-projects";
 import { ProjectGrid } from "@/features/projects/project-grid";
 import { ProjectsLayout } from "@/features/projects/projects-layout";
-import { requireSession } from "@/server/auth/session";
+import { requireSession, viewerOf } from "@/server/auth/session";
 import { getGithubAccountId } from "@/server/db/accounts";
 import { getDb } from "@/server/db/client";
 import { listProjects } from "@/server/db/projects";
-import { isDemoUser } from "@/server/demo/demo-user";
 
 /** screens 5.10: the dashboard (MVP: the simple one). */
 export default async function ProjectsPage() {
-  const { user } = await requireSession();
+  const session = await requireSession();
+  const { user } = session;
   const db = getDb();
   const [projects, githubAccountId] = await Promise.all([
-    listProjects(db, user.id),
+    listProjects(db, viewerOf(session)),
     getGithubAccountId(db, user.id),
   ]);
   const githubConnected = githubAccountId !== undefined;
@@ -24,7 +24,7 @@ export default async function ProjectsPage() {
       {projects.length === 0 ? (
         <EmptyProjects githubConnected={githubConnected} />
       ) : (
-        <ProjectGrid projects={projects} demo={isDemoUser(user.id)} />
+        <ProjectGrid projects={projects} />
       )}
     </ProjectsLayout>
   );

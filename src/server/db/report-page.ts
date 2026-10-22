@@ -4,12 +4,13 @@ import { pickChecks } from "../check/report-view";
 import type { Db } from "./client";
 import { checkPackages, checks, projects, reports } from "./schema";
 
-/** `ownerId` comes with `projectId`, for `canAccessReport`. */
+/** `ownerId` and `demoSessionId` come with `projectId`, for `canAccessReport`. */
 export type ReportMeta = {
   id: string;
   expiresAt: Date | null;
   projectId: string | null;
   ownerId: string | null;
+  demoSessionId: string | null;
 };
 
 const metaColumns = {
@@ -17,6 +18,7 @@ const metaColumns = {
   expiresAt: reports.expiresAt,
   projectId: reports.projectId,
   ownerId: projects.ownerId,
+  demoSessionId: projects.demoSessionId,
 };
 
 /**

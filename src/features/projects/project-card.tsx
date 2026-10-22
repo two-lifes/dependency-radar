@@ -45,16 +45,15 @@ export function ProjectCard({
   status,
   onCheckNow,
   onDelete,
-  demo = false,
 }: {
   project: DashboardProject;
   status: DisplayStatus;
   onCheckNow: () => void;
   onDelete: () => void;
-  /** The shared demo account can't delete projects (plan.md 25). */
-  demo?: boolean;
 }) {
   const { result } = project;
+  // The seeded demo projects are shared by every visitor (plan.md 26.1).
+  const locked = !project.editable;
   const score = result?.score ?? null;
   const vulnerabilities = result?.vulnerabilityCount ?? null;
   const SourceIcon = project.source === "github" ? GitBranch : FileJson;
@@ -109,11 +108,11 @@ export function ProjectCard({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              disabled={demo}
+              disabled={locked}
               onSelect={onDelete}
             >
               <Trash2 aria-hidden />
-              {demo ? (
+              {locked ? (
                 <span className="grid">
                   {copy.delete}
                   <span className="text-xs text-muted-foreground">

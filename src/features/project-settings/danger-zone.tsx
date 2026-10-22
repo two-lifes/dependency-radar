@@ -17,7 +17,7 @@ export function DangerZone({
   demo = false,
 }: {
   project: { id: string; name: string };
-  /** The shared demo account can't delete projects (plan.md 25). */
+  /** A seeded demo project is shared by every visitor (plan.md 26.1). */
   demo?: boolean;
 }) {
   const router = useRouter();

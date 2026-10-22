@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
     expiresAt: null,
     projectId: null as string | null,
     ownerId: null as string | null,
+    demoSessionId: null as string | null,
     source: "paste",
     repoUrl: null as string | null,
   },
@@ -26,6 +27,7 @@ const guestPasteReport = {
   expiresAt: null,
   projectId: null,
   ownerId: null,
+  demoSessionId: null,
   source: "paste",
   repoUrl: null,
 };
@@ -45,6 +47,11 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("@/server/auth/session", () => ({
   getOptionalSession: async () => state.session,
+  // The real one only reads two fields; every mocked session is "s1".
+  viewerOf: ({ user }: { user: { id: string } }) => ({
+    userId: user.id,
+    sessionId: "s1",
+  }),
 }));
 vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/server/db/check-store", () => ({ createPgCheckStore: () => ({}) }));
@@ -381,7 +388,7 @@ describe("saveReport", () => {
     expect(projects.saveGuestReport).toHaveBeenCalledWith(
       expect.anything(),
       REPORT_ID,
-      "u1",
+      { userId: "u1", sessionId: "s1" },
     );
   });
 

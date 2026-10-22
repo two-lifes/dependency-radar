@@ -9,6 +9,7 @@ import { SettingsSection } from "@/components/settings-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
+import { DemoHint } from "../demo/demo-hint";
 import { renameProject } from "../projects/actions";
 import { newProjectCopy, PROJECT_NAME_MAX } from "../projects/copy";
 import { projectSettingsCopy as copy } from "./copy";
@@ -28,9 +29,12 @@ type FormValues = z.input<typeof formSchema>;
 export function GeneralSection({
   projectId,
   name,
+  demo = false,
 }: {
   projectId: string;
   name: string;
+  /** A seeded demo project is shared by every visitor (plan.md 26.1). */
+  demo?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const {
@@ -47,6 +51,7 @@ export function GeneralSection({
   const typed = useWatch({ control, name: "name" });
   const inputId = useId();
   const errorId = useId();
+  const hintId = useId();
   const unchanged = typed.trim() === name;
 
   const onValid = ({ name: next }: FormValues) => {
@@ -81,9 +86,9 @@ export function GeneralSection({
             id={inputId}
             autoComplete="off"
             maxLength={PROJECT_NAME_MAX}
-            disabled={pending}
+            disabled={pending || demo}
             aria-invalid={errors.name ? true : undefined}
-            aria-describedby={errors.name ? errorId : undefined}
+            aria-describedby={errors.name ? errorId : demo ? hintId : undefined}
             {...register("name")}
           />
           {errors.name ? (
@@ -91,9 +96,10 @@ export function GeneralSection({
               {errors.name.message}
             </p>
           ) : null}
+          {demo ? <DemoHint id={hintId} /> : null}
         </div>
         <div className="flex justify-end">
-          <Button type="submit" disabled={unchanged || pending}>
+          <Button type="submit" disabled={unchanged || pending || demo}>
             {pending ? (
               <>
                 <Loader2 className="motion-safe:animate-spin" aria-hidden />

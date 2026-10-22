@@ -6,6 +6,8 @@ export type DashboardProject = {
   name: string;
   source: "paste" | "upload" | "github";
   repoUrl: string | null;
+  /** False for the seeded demo projects: no delete (plan.md 26.1). */
+  editable: boolean;
   /** The newest check of any status; null before the first one. */
   latest: {
     id: string;

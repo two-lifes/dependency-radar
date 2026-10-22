@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
         reportId: string;
         source: "paste" | "upload" | "github";
         repoUrl: string | null;
+        editable: boolean;
       }
     | undefined,
   project: undefined as
@@ -47,6 +48,11 @@ const signedIn = vi.hoisted(() => ({ userId: "u1" }));
 vi.mock("@/server/auth/session", () => ({
   requireSession: async () => ({ user: { id: signedIn.userId } }),
   getOptionalSession: async () => ({ user: { id: "u1" } }),
+  // The real one only reads two fields; every mocked session is "s1".
+  viewerOf: ({ user }: { user: { id: string } }) => ({
+    userId: user.id,
+    sessionId: "s1",
+  }),
 }));
 vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/server/db/check-store", () => ({ createPgCheckStore: () => ({}) }));
@@ -105,7 +111,7 @@ describe("createProject", () => {
     ).rejects.toThrow("redirect:/projects/p-new/dependencies");
     expect(db.createProjectWithCheck).toHaveBeenCalledWith(
       {},
-      "u1",
+      { userId: "u1", sessionId: "s1" },
       "My shop",
       expect.objectContaining({ source: "paste" }),
     );
@@ -142,7 +148,7 @@ describe("createProject", () => {
     ).rejects.toThrow("redirect:");
     expect(db.createProjectWithCheck).toHaveBeenCalledWith(
       {},
-      "u1",
+      { userId: "u1", sessionId: "s1" },
       "shop",
       expect.objectContaining({ repoUrl: "https://github.com/acme/web" }),
     );
@@ -160,7 +166,7 @@ describe("createProject", () => {
     ).rejects.toThrow("redirect:");
     expect(db.createProjectWithCheck).toHaveBeenCalledWith(
       {},
-      "u1",
+      { userId: "u1", sessionId: "s1" },
       "web",
       expect.anything(),
     );
@@ -283,15 +289,23 @@ describe("removeProject", () => {
     expect(db.deleteProject).not.toHaveBeenCalled();
 
     expect(await removeProject(PROJECT_ID)).toEqual({ ok: true });
-    expect(db.deleteProject).toHaveBeenCalledWith({}, PROJECT_ID, "u1");
+    expect(db.deleteProject).toHaveBeenCalledWith({}, PROJECT_ID, {
+      userId: "u1",
+      sessionId: "s1",
+    });
   });
 
-  it("deletes nothing for the demo account", async () => {
+  // The SQL condition itself is tested in `server/db/project-access.test.ts`.
+  it("leaves a demo session's delete to the database rule", async () => {
     vi.clearAllMocks();
     signedIn.userId = DEMO_USER.id;
     try {
+      db.deleteProject.mockResolvedValueOnce(false);
       expect(await removeProject(PROJECT_ID)).toEqual({ ok: false });
-      expect(db.deleteProject).not.toHaveBeenCalled();
+      expect(db.deleteProject).toHaveBeenCalledWith({}, PROJECT_ID, {
+        userId: DEMO_USER.id,
+        sessionId: "s1",
+      });
     } finally {
       signedIn.userId = "u1";
     }
@@ -306,7 +320,7 @@ describe("renameProject", () => {
     expect(db.renameProject).toHaveBeenCalledWith(
       {},
       PROJECT_ID,
-      "u1",
+      { userId: "u1", sessionId: "s1" },
       "New name",
     );
   });
@@ -338,6 +352,7 @@ describe("replaceSource", () => {
       reportId: "r1",
       source: "github",
       repoUrl: "https://github.com/acme/shop",
+      editable: true,
     };
     vi.clearAllMocks();
   });
@@ -413,6 +428,14 @@ describe("replaceSource", () => {
 
   it("treats someone else's project as missing, before counting a check", async () => {
     state.settings = undefined;
+    const result = await replace({ source: "paste", packageJson: MANIFEST });
+    expect(result.error?.message).toBe("Something went wrong. Try again.");
+    expect(state.count).toBe(0);
+    expect(control.startCheck).not.toHaveBeenCalled();
+  });
+
+  it("refuses a seeded demo project, before counting a check", async () => {
+    if (state.settings) state.settings.editable = false;
     const result = await replace({ source: "paste", packageJson: MANIFEST });
     expect(result.error?.message).toBe("Something went wrong. Try again.");
     expect(state.count).toBe(0);

@@ -2,7 +2,7 @@ import {
   canAccessReport,
   type ReportOwnership,
 } from "./analysis/report-access";
-import { getOptionalSession } from "./auth/session";
+import { getOptionalSession, viewerOf } from "./auth/session";
 
 /**
  * `canAccessReport` for the current visitor. Every way into a report goes
@@ -13,5 +13,5 @@ export async function canOpenReport(report: ReportOwnership): Promise<boolean> {
   // A guest report needs no session read.
   if (report.projectId === null) return true;
   const session = await getOptionalSession();
-  return canAccessReport(report, session?.user.id ?? null);
+  return canAccessReport(report, session ? viewerOf(session) : null);
 }

@@ -3,7 +3,7 @@ import { type ReactNode, Suspense } from "react";
 import { z } from "zod";
 import { ReportSkeleton } from "@/features/report/report-skeleton";
 import { ReportView } from "@/features/report/report-view";
-import { requireSession } from "@/server/auth/session";
+import { requireSession, viewerOf } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { getProjectReportMeta } from "@/server/db/projects";
 
@@ -24,8 +24,8 @@ export default async function ProjectReportLayout({
   const { id } = await params;
   // Checked before the skeleton streams, so these get a real 404 status.
   if (!idSchema.safeParse(id).success) notFound();
-  const { user } = await requireSession();
-  const project = await getProjectReportMeta(getDb(), id, user.id);
+  const session = await requireSession();
+  const project = await getProjectReportMeta(getDb(), id, viewerOf(session));
   if (!project) notFound();
 
   return (

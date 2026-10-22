@@ -1,7 +1,13 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { DashboardProject } from "../analysis/dashboard-card";
+import {
+  newProjectSession,
+  projectAccess,
+  type Viewer,
+} from "../analysis/project-access";
 import { isReportExpired } from "../check/report-view";
 import type { Db } from "./client";
+import { editableProjects, visibleProjects } from "./project-access";
 import type { NewGuestReport } from "./reports";
 import { checkPackages, checks, projects, reports } from "./schema";
 
@@ -22,7 +28,7 @@ export type SaveReportOutcome =
 export function saveGuestReport(
   db: Db,
   reportId: string,
-  userId: string,
+  viewer: Viewer,
   now: Date = new Date(),
 ): Promise<SaveReportOutcome> {
   return db.transaction(async (tx) => {
@@ -44,9 +50,7 @@ export function saveGuestReport(
       const [own] = await tx
         .select({ id: projects.id })
         .from(projects)
-        .where(
-          and(eq(projects.id, report.projectId), eq(projects.ownerId, userId)),
-        )
+        .where(and(eq(projects.id, report.projectId), visibleProjects(viewer)))
         .limit(1);
       return own ? { kind: "saved", projectId: own.id } : { kind: "not-found" };
     }
@@ -54,7 +58,11 @@ export function saveGuestReport(
 
     const [project] = await tx
       .insert(projects)
-      .values({ ownerId: userId, name: report.name ?? UNTITLED_PROJECT })
+      .values({
+        ownerId: viewer.userId,
+        demoSessionId: newProjectSession(viewer),
+        name: report.name ?? UNTITLED_PROJECT,
+      })
       .returning({ id: projects.id });
     if (!project) throw new Error("Insert into projects returned no row");
 
@@ -72,11 +80,11 @@ export type ProjectReportMeta = {
   reportId: string;
 };
 
-/** A project and its report, only for its owner (screens 5.4: else 404). */
+/** A project and its report, only for who may see it (screens 5.4: else 404). */
 export async function getProjectReportMeta(
   db: Db,
   projectId: string,
-  userId: string,
+  viewer: Viewer,
 ): Promise<ProjectReportMeta | undefined> {
   const [found] = await db
     .select({
@@ -86,7 +94,7 @@ export async function getProjectReportMeta(
     })
     .from(projects)
     .innerJoin(reports, eq(reports.projectId, projects.id))
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .where(and(eq(projects.id, projectId), visibleProjects(viewer)))
     .limit(1);
   return found;
 }
@@ -97,14 +105,18 @@ export async function getProjectReportMeta(
  */
 export function createProjectWithCheck(
   db: Db,
-  userId: string,
+  viewer: Viewer,
   name: string,
   { source, repoUrl, input }: NewGuestReport,
 ): Promise<{ projectId: string }> {
   return db.transaction(async (tx) => {
     const [project] = await tx
       .insert(projects)
-      .values({ ownerId: userId, name })
+      .values({
+        ownerId: viewer.userId,
+        demoSessionId: newProjectSession(viewer),
+        name,
+      })
       .returning({ id: projects.id });
     if (!project) throw new Error("Insert into projects returned no row");
 
@@ -137,53 +149,66 @@ export type ProjectSettings = {
   reportId: string;
   source: (typeof reports.$inferSelect)["source"];
   repoUrl: string | null;
+  /** False for the seeded demo projects: settings are read-only. */
+  editable: boolean;
 };
 
-/** screens 5.12: what the settings page shows, only for the project's owner. */
+/** screens 5.12: what the settings page shows, only for who may see it. */
 export async function getProjectSettings(
   db: Db,
   projectId: string,
-  userId: string,
+  viewer: Viewer,
 ): Promise<ProjectSettings | undefined> {
   const [found] = await db
     .select({
       id: projects.id,
       name: projects.name,
+      ownerId: projects.ownerId,
+      demoSessionId: projects.demoSessionId,
       reportId: reports.id,
       source: reports.source,
       repoUrl: reports.repoUrl,
     })
     .from(projects)
     .innerJoin(reports, eq(reports.projectId, projects.id))
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .where(and(eq(projects.id, projectId), visibleProjects(viewer)))
     .limit(1);
-  return found;
+  if (!found) return undefined;
+  const { ownerId, demoSessionId, ...settings } = found;
+  return {
+    ...settings,
+    editable: projectAccess({ ownerId, demoSessionId }, viewer) === "write",
+  };
 }
 
-/** Renames an owned project; `false` if it isn't this user's. */
+/** Renames a project; `false` if this viewer can't change it. */
 export async function renameProject(
   db: Db,
   projectId: string,
-  userId: string,
+  viewer: Viewer,
   name: string,
 ): Promise<boolean> {
   const renamed = await db
     .update(projects)
     .set({ name, updatedAt: new Date() })
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .where(and(eq(projects.id, projectId), editableProjects(viewer)))
     .returning({ id: projects.id });
   return renamed.length > 0;
 }
 
-/** Deletes an owned project; its report and checks go with it (cascade). */
+/**
+ * Deletes a project this viewer can change; its report and checks go with it
+ * (cascade). The rule is in the WHERE itself, so whatever id is sent, a
+ * seeded demo project or another demo session's stays (plan.md 26.1).
+ */
 export async function deleteProject(
   db: Db,
   projectId: string,
-  userId: string,
+  viewer: Viewer,
 ): Promise<boolean> {
   const deleted = await db
     .delete(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .where(and(eq(projects.id, projectId), editableProjects(viewer)))
     .returning({ id: projects.id });
   return deleted.length > 0;
 }
@@ -191,32 +216,34 @@ export async function deleteProject(
 /** The repositories of the user's projects, to mark them "Added" (screens 5.11.1). */
 export function listProjectRepos(
   db: Db,
-  userId: string,
+  viewer: Viewer,
 ): Promise<{ projectId: string; repoUrl: string | null }[]> {
   return db
     .select({ projectId: projects.id, repoUrl: reports.repoUrl })
     .from(projects)
     .innerJoin(reports, eq(reports.projectId, projects.id))
-    .where(eq(projects.ownerId, userId))
+    .where(visibleProjects(viewer))
     .orderBy(asc(projects.createdAt), asc(projects.id));
 }
 
 /** screens 5.10: the user's projects in the order they were added. */
 export async function listProjects(
   db: Db,
-  userId: string,
+  viewer: Viewer,
 ): Promise<DashboardProject[]> {
   const owned = await db
     .select({
       id: projects.id,
       name: projects.name,
+      ownerId: projects.ownerId,
+      demoSessionId: projects.demoSessionId,
       reportId: reports.id,
       source: reports.source,
       repoUrl: reports.repoUrl,
     })
     .from(projects)
     .innerJoin(reports, eq(reports.projectId, projects.id))
-    .where(eq(projects.ownerId, userId))
+    .where(visibleProjects(viewer))
     .orderBy(asc(projects.createdAt), asc(projects.id));
   if (owned.length === 0) return [];
   const reportIds = owned.map((project) => project.reportId);
@@ -266,7 +293,8 @@ export async function listProjects(
   const resultBy = new Map(results.map((check) => [check.reportId, check]));
   const checkedBy = new Map(progress.map((row) => [row.checkId, row.checked]));
 
-  return owned.map(({ id, name, reportId, source, repoUrl }) => {
+  return owned.map((project) => {
+    const { id, name, reportId, source, repoUrl } = project;
     const check = latestBy.get(reportId);
     const result = resultBy.get(reportId);
     return {
@@ -274,6 +302,7 @@ export async function listProjects(
       name,
       source,
       repoUrl,
+      editable: projectAccess(project, viewer) === "write",
       latest: check
         ? {
             id: check.id,
@@ -306,7 +335,7 @@ export type ProjectCheckState = {
 export async function getProjectCheckState(
   db: Db,
   projectId: string,
-  userId: string,
+  viewer: Viewer,
 ): Promise<ProjectCheckState | undefined> {
   const [project] = await db
     .select({
@@ -316,7 +345,7 @@ export async function getProjectCheckState(
     })
     .from(projects)
     .innerJoin(reports, eq(reports.projectId, projects.id))
-    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .where(and(eq(projects.id, projectId), visibleProjects(viewer)))
     .limit(1);
   if (!project) return undefined;
   const [latest] = await db

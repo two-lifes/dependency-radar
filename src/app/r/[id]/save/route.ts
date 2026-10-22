@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { savedReportPath } from "@/features/report/saved-report";
 import { loginPath } from "@/lib/safe-next";
-import { getOptionalSession } from "@/server/auth/session";
+import { getOptionalSession, viewerOf } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { saveGuestReport } from "@/server/db/projects";
 
@@ -27,7 +27,7 @@ export async function GET(
   const session = await getOptionalSession();
   if (!session) return seeOther(request, loginPath(`/r/${id}/save`));
 
-  const outcome = await saveGuestReport(getDb(), id, session.user.id);
+  const outcome = await saveGuestReport(getDb(), id, viewerOf(session));
   return seeOther(request, savedReportPath(id, outcome));
 }
 
