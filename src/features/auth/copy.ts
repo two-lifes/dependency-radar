@@ -11,6 +11,9 @@ export const authCopy = {
     submit: "Send sign-in link",
     pending: "Sending…",
     noPasswords: "No passwords. We'll email you a magic link.",
+    // decisions 41: shown while the server can't send email yet.
+    emailSoon: "Coming soon",
+    emailSoonHint: "Email sign-in is coming soon. Use GitHub for now.",
   },
   errors: {
     invalidEmail: "Enter a valid email address.",

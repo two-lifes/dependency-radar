@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authClient } from "./auth-client";
@@ -32,7 +33,10 @@ export function LoginForm({
   next: string;
   /** From `?reason=` after a failed GitHub sign-in or a dead email link. */
   error?: LoginError;
-  /** False while the server can't send email: GitHub is the only way in. */
+  /**
+   * False while the server can't send email: the form stays visible but
+   * disabled, marked "Coming soon", and GitHub is the only way in.
+   */
   emailEnabled?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -46,6 +50,7 @@ export function LoginForm({
   const [dismissedAttempt, setDismissedAttempt] = useState(0);
   const errorId = useId();
   const emailId = useId();
+  const hintId = useId();
   const emailRef = useRef<HTMLInputElement>(null);
 
   const fieldError =
@@ -112,63 +117,67 @@ export function LoginForm({
         )}
       </Button>
 
-      {emailEnabled ? (
-        <>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="h-px flex-1 bg-border" aria-hidden="true" />
-            {copy.or}
-            <span className="h-px flex-1 bg-border" aria-hidden="true" />
-          </div>
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+        {copy.or}
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      </div>
 
-          {/* noValidate: the server answers with the screens 5.2 message. */}
-          <form action={formAction} noValidate className="grid gap-4">
-            <input type="hidden" name="next" value={next} />
-            <div className="grid gap-2">
+      {/* noValidate: the server answers with the screens 5.2 message. */}
+      <form action={formAction} noValidate>
+        {/* A disabled fieldset disables the field and the submit button. */}
+        <fieldset disabled={!emailEnabled} className="grid min-w-0 gap-4">
+          <input type="hidden" name="next" value={next} />
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2">
               <label htmlFor={emailId} className="text-sm font-medium">
                 {copy.emailLabel}
               </label>
-              <Input
-                ref={emailRef}
-                id={emailId}
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder={copy.emailPlaceholder}
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  setDismissedAttempt(state.attempt);
-                }}
-                disabled={busy}
-                aria-invalid={fieldError ? true : undefined}
-                aria-describedby={fieldError ? errorId : undefined}
-              />
-              {fieldError ? (
-                <p id={errorId} role="alert" className="text-sm text-danger">
-                  {fieldError}
-                </p>
-              ) : null}
+              {emailEnabled ? null : <Badge>{copy.emailSoon}</Badge>}
             </div>
-            <Button type="submit" size="lg" disabled={busy}>
-              {pending ? (
-                <>
-                  <Loader2
-                    className="motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                  {copy.pending}
-                </>
-              ) : (
-                copy.submit
-              )}
-            </Button>
-          </form>
+            <Input
+              ref={emailRef}
+              id={emailId}
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder={copy.emailPlaceholder}
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setDismissedAttempt(state.attempt);
+              }}
+              disabled={busy}
+              aria-invalid={fieldError ? true : undefined}
+              aria-describedby={
+                fieldError ? errorId : emailEnabled ? undefined : hintId
+              }
+            />
+            {fieldError ? (
+              <p id={errorId} role="alert" className="text-sm text-danger">
+                {fieldError}
+              </p>
+            ) : null}
+          </div>
+          <Button type="submit" size="lg" disabled={busy}>
+            {pending ? (
+              <>
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                {copy.pending}
+              </>
+            ) : (
+              copy.submit
+            )}
+          </Button>
+        </fieldset>
+      </form>
 
-          <p className="text-center text-sm text-muted-foreground">
-            {copy.noPasswords}
-          </p>
-        </>
-      ) : null}
+      <p id={hintId} className="text-center text-sm text-muted-foreground">
+        {emailEnabled ? copy.noPasswords : copy.emailSoonHint}
+      </p>
     </div>
   );
 }

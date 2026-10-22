@@ -106,17 +106,23 @@ describe("LoginForm", () => {
     ).toBeDisabled();
   });
 
-  it("offers only GitHub when email sign-in is off", () => {
+  it("shows the email form disabled and marked Coming soon when email sign-in is off", () => {
     render(
       <LoginForm action={vi.fn()} next="/projects" emailEnabled={false} />,
     );
     expect(
       screen.getByRole("button", { name: "Continue with GitHub" }),
-    ).toBeVisible();
+    ).toBeEnabled();
+    expect(screen.getByText("or")).toBeVisible();
+    const field = screen.getByRole("textbox", { name: "Email" });
+    expect(field).toBeDisabled();
+    expect(field).toHaveAccessibleDescription(
+      "Email sign-in is coming soon. Use GitHub for now.",
+    );
     expect(
-      screen.queryByRole("textbox", { name: "Email" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("or")).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Send sign-in link" }),
+    ).toBeDisabled();
+    expect(screen.getByText("Coming soon")).toBeVisible();
     expect(
       screen.queryByText("No passwords. We'll email you a magic link."),
     ).not.toBeInTheDocument();
