@@ -9,7 +9,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +22,7 @@ import { checkAgain } from "./actions";
 import { reportCopy } from "./copy";
 import { RelativeTime } from "./relative-time";
 import { useReport } from "./report-context";
+import { useReportAction } from "./use-report-action";
 
 const copy = reportCopy;
 
@@ -47,10 +47,10 @@ export function ReportHeader({
   warnings: string[];
 }) {
   const { running } = useReport();
-  const [pending, startTransition] = useTransition();
+  const [pending, run] = useReportAction();
   const checkDisabled = running || pending;
 
-  const onCheckAgain = () => startTransition(() => checkAgain(reportId));
+  const onCheckAgain = () => run(() => checkAgain(reportId));
   const onCopyLink = async () => {
     try {
       // The current URL carries the open tab and its filters.

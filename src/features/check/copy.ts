@@ -57,6 +57,10 @@ export function minutesUntilRetry(retryAfterSeconds = 60): string {
   return minutes === 1 ? "1 minute" : `${minutes} minutes`;
 }
 
+// spec 9: hourly check limit, on the landing and in the report.
+export const tooManyChecks = (retryAfterSeconds: number) =>
+  `Too many checks. Try again in ${minutesUntilRetry(retryAfterSeconds)}.`;
+
 // screens 5.1, "GitHub URL" source.
 export const githubErrorCopy: {
   [K in GithubInputError["code"]]: (

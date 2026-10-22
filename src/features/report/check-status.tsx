@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { cancel, resume, retry } from "./actions";
+import { cancel, type ReportActionResult, resume, retry } from "./actions";
 import { reportCopy } from "./copy";
 import { serializeFilters } from "./filters";
 import { useReport } from "./report-context";
+import { useReportAction } from "./use-report-action";
 
 const copy = reportCopy;
 
@@ -91,9 +92,9 @@ export function CheckBanner({
   basePath: string;
 }) {
   const search = useSearchParams();
-  const [pending, startTransition] = useTransition();
-  const run = (action: (id: string) => Promise<void>) =>
-    startTransition(() => action(checkId));
+  const [pending, runAction] = useReportAction();
+  const run = (action: (id: string) => Promise<ReportActionResult>) =>
+    runAction(() => action(checkId));
 
   if (status === "cancelled") {
     return (
@@ -158,9 +159,9 @@ export function CheckFailed({
   onTryAgain,
 }: {
   reason: string;
-  onTryAgain: () => Promise<void>;
+  onTryAgain: () => Promise<ReportActionResult>;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [pending, run] = useReportAction();
   return (
     <section
       role="alert"
@@ -175,7 +176,7 @@ export function CheckFailed({
         {copy.failed.title}
       </h2>
       <p className="text-base text-muted-foreground">{reason}</p>
-      <Button disabled={pending} onClick={() => startTransition(onTryAgain)}>
+      <Button disabled={pending} onClick={() => run(onTryAgain)}>
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
         {copy.failed.tryAgain}
       </Button>

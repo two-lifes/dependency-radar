@@ -1,14 +1,18 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReportActionResult } from "./actions";
 import { CheckBanner, CheckFailed } from "./check-status";
 import { checkFailureCopy } from "./copy";
 
 const actions = vi.hoisted(() => ({
-  cancel: vi.fn(async () => {}),
-  resume: vi.fn(async () => {}),
-  retry: vi.fn(async () => {}),
+  cancel: vi.fn(async (): Promise<ReportActionResult> => ({})),
+  resume: vi.fn(async (): Promise<ReportActionResult> => ({})),
+  retry: vi.fn(async (): Promise<ReportActionResult> => ({})),
 }));
 vi.mock("./actions", () => actions);
+
+const toasts = vi.hoisted(() => ({ toast: vi.fn() }));
+vi.mock("@/components/ui/toast", () => toasts);
 
 const navigation = vi.hoisted(() => ({ search: "" }));
 vi.mock("next/navigation", () => ({
@@ -60,11 +64,46 @@ describe("CheckBanner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
     expect(actions.resume).toHaveBeenCalledWith("c1");
   });
+
+  it("toasts the rate limit when Retry failed is refused", async () => {
+    const message = "Too many checks. Try again in 40 minutes.";
+    actions.retry.mockResolvedValueOnce({ error: message });
+    render(
+      <CheckBanner
+        status="partial"
+        checkId="c1"
+        sourceFailures={3}
+        basePath="/r/abc"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry failed" }));
+
+    await waitFor(() =>
+      expect(toasts.toast).toHaveBeenCalledWith({ title: message }),
+    );
+  });
+
+  it("doesn't toast when the action goes through", async () => {
+    render(
+      <CheckBanner
+        status="cancelled"
+        checkId="c1"
+        sourceFailures={0}
+        basePath="/r/abc"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+    await waitFor(() => expect(actions.resume).toHaveBeenCalled());
+    expect(toasts.toast).not.toHaveBeenCalled();
+  });
 });
 
 describe("CheckFailed", () => {
   it("shows the reason and tries again", () => {
-    const onTryAgain = vi.fn(async () => {});
+    const onTryAgain = vi.fn(async (): Promise<ReportActionResult> => ({}));
     render(
       <CheckFailed
         reason="Couldn't reach the npm registry."
@@ -77,6 +116,23 @@ describe("CheckFailed", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onTryAgain).toHaveBeenCalled();
+  });
+
+  it("toasts the rate limit and enables Try again again", async () => {
+    const message = "Too many checks. Try again in 40 minutes.";
+    render(
+      <CheckFailed
+        reason="Couldn't reach the npm registry."
+        onTryAgain={async () => ({ error: message })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() =>
+      expect(toasts.toast).toHaveBeenCalledWith({ title: message }),
+    );
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
   });
 });
 

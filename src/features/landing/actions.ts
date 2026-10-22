@@ -14,8 +14,13 @@ import {
   lockedVersionsFromText,
   readUploadedLockfile,
 } from "@/server/lockfile-upload";
+import { consumeCheck } from "@/server/rate-limit";
 import { fetchRepoSource } from "@/server/sources/github";
-import { githubErrorCopy, manifestErrorCopy } from "../check/copy";
+import {
+  githubErrorCopy,
+  manifestErrorCopy,
+  tooManyChecks,
+} from "../check/copy";
 import type { CheckFormState, CheckSource } from "./check-form-state";
 import { landingCopy } from "./copy";
 
@@ -48,6 +53,27 @@ export async function startGuestCheck(
     };
   }
   const form = parsed.data;
+
+  // Before reading GitHub: an over-limit request shouldn't spend its quota.
+  let allowed: Awaited<ReturnType<typeof consumeCheck>>;
+  try {
+    allowed = await consumeCheck();
+  } catch (error) {
+    console.error("[landing] couldn't count the check", error);
+    return {
+      attempt,
+      error: { source: form.source, message: landingCopy.errors.generic },
+    };
+  }
+  if (!allowed.ok) {
+    return {
+      attempt,
+      error: {
+        source: form.source,
+        message: tooManyChecks(allowed.error.retryAfterSeconds),
+      },
+    };
+  }
 
   const outcome = await prepareReport(form);
   if (!outcome.ok) {
