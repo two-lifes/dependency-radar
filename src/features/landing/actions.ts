@@ -2,25 +2,16 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { parseGithubRepoUrl } from "@/server/analysis/github-repo";
-import type { ManifestError } from "@/server/analysis/parse-manifest";
 import {
   buildReportInput,
   type ReportInput,
 } from "@/server/analysis/report-input";
 import { getDb } from "@/server/db/client";
 import { createGuestReport, type NewGuestReport } from "@/server/db/reports";
-import {
-  lockedVersionsFromText,
-  readUploadedLockfile,
-} from "@/server/lockfile-upload";
+import { readUploadedLockfile } from "@/server/lockfile-upload";
 import { consumeCheck } from "@/server/rate-limit";
-import { fetchRepoSource } from "@/server/sources/github";
-import {
-  githubErrorCopy,
-  manifestErrorCopy,
-  tooManyChecks,
-} from "../check/copy";
+import { tooManyChecks } from "../check/copy";
+import { manifestMessage, readRepoInput } from "../check/read-repo";
 import type { CheckFormState, CheckSource } from "./check-form-state";
 import { landingCopy } from "./copy";
 
@@ -120,65 +111,17 @@ async function prepareReport(
     );
   }
 
-  const repo = parseGithubRepoUrl(form.url);
-  if (!repo) {
-    return {
-      ok: false,
-      message: githubErrorCopy["invalid-url"]({ code: "invalid-url" }),
-    };
-  }
-  const source = await fetchRepoSource(repo, {
-    token: process.env.GITHUB_TOKEN,
-  });
-  if (!source.ok) {
-    const { error } = source;
-    switch (error.code) {
-      case "not-found":
-        return { ok: false, message: githubErrorCopy[error.code](error) };
-      case "no-package-json":
-        return { ok: false, message: githubErrorCopy[error.code](error) };
-      case "unavailable":
-        return { ok: false, message: githubErrorCopy[error.code](error) };
-      case "invalid-response":
-        return { ok: false, message: githubErrorCopy[error.code](error) };
-      case "rate-limited":
-        return { ok: false, message: githubErrorCopy[error.code](error) };
-    }
-  }
-
-  const { packageJson, packageLock, files } = source.value;
-  const lockfile =
-    packageLock === undefined ? undefined : lockedVersionsFromText(packageLock);
-  return toOutcome(
-    buildReportInput({ packageJson, lockfile, repoFiles: files }),
-    "github",
-    `https://github.com/${repo.owner}/${repo.repo}`,
-  );
+  const read = await readRepoInput(form.url);
+  if (!read.ok) return { ok: false, message: read.error };
+  const { input, repoUrl } = read.value;
+  return { ok: true, report: { source: "github", repoUrl, input } };
 }
 
 function toOutcome(
   result: ReturnType<typeof buildReportInput>,
   source: CheckSource,
-  repoUrl?: string,
 ): Outcome {
   if (!result.ok) return { ok: false, message: manifestMessage(result.error) };
   const input: ReportInput = result.value;
-  return { ok: true, report: { source, repoUrl, input } };
-}
-
-function manifestMessage(error: ManifestError): string {
-  switch (error.code) {
-    case "too-large":
-      return manifestErrorCopy["too-large"](error);
-    case "invalid-json":
-      return manifestErrorCopy["invalid-json"](error);
-    case "lockfile":
-      return manifestErrorCopy.lockfile(error);
-    case "invalid-package-json":
-      return manifestErrorCopy["invalid-package-json"](error);
-    case "no-dependencies":
-      return manifestErrorCopy["no-dependencies"](error);
-    case "too-many-dependencies":
-      return manifestErrorCopy["too-many-dependencies"](error);
-  }
+  return { ok: true, report: { source, input } };
 }
