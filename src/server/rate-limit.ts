@@ -1,9 +1,9 @@
 import { headers } from "next/headers";
 import {
   clientIp,
-  RATE_LIMITS,
   type RateLimited,
   rateLimitDecision,
+  rateLimitSubject,
   windowStart,
 } from "./analysis/rate-limit";
 import type { Result } from "./analysis/result";
@@ -20,12 +20,10 @@ export async function consumeCheck(
   now: Date = new Date(),
 ): Promise<Result<void, RateLimited>> {
   const session = await getOptionalSession();
-  // Without a known address all such guests share one counter: stricter, but
-  // never unlimited.
-  const subject = session
-    ? `user:${session.user.id}`
-    : `ip:${clientIp(await headers()) ?? "unknown"}`;
-  const limit = session ? RATE_LIMITS.user : RATE_LIMITS.guest;
+  const { subject, limit } = rateLimitSubject(
+    session?.user.id ?? null,
+    clientIp(await headers()),
+  );
   const start = windowStart(now);
   const count = await hitRateLimit(getDb(), subject, start);
   return rateLimitDecision(count, limit, start, now);

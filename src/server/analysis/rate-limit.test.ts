@@ -3,8 +3,10 @@ import {
   clientIp,
   RATE_LIMITS,
   rateLimitDecision,
+  rateLimitSubject,
   windowStart,
 } from "./rate-limit";
+import { DEMO_USER } from "../demo/demo-user";
 
 describe("windowStart", () => {
   it("rounds down to the hour", () => {
@@ -73,5 +75,32 @@ describe("clientIp", () => {
   it("returns null without either header", () => {
     expect(clientIp(new Headers())).toBeNull();
     expect(clientIp(new Headers({ "x-forwarded-for": " " }))).toBeNull();
+  });
+});
+
+describe("rateLimitSubject", () => {
+  it("counts a signed-in user per account", () => {
+    expect(rateLimitSubject("u1", "203.0.113.7")).toEqual({
+      subject: "user:u1",
+      limit: RATE_LIMITS.user,
+    });
+  });
+
+  it("counts a guest per IP", () => {
+    expect(rateLimitSubject(null, "203.0.113.7")).toEqual({
+      subject: "ip:203.0.113.7",
+      limit: RATE_LIMITS.guest,
+    });
+  });
+
+  it("counts demo visitors per IP, like guests", () => {
+    expect(rateLimitSubject(DEMO_USER.id, "203.0.113.7")).toEqual({
+      subject: "ip:203.0.113.7",
+      limit: RATE_LIMITS.guest,
+    });
+  });
+
+  it("puts callers without a known address on one counter", () => {
+    expect(rateLimitSubject(null, null).subject).toBe("ip:unknown");
   });
 });

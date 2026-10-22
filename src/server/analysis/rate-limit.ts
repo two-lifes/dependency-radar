@@ -1,3 +1,4 @@
+import { isDemoUser } from "../demo/demo-user";
 import type { Result } from "./result";
 
 // spec 9: checks per hour, per IP for guests and per account once signed in.
@@ -5,6 +6,21 @@ export const RATE_LIMITS = { guest: 10, user: 30 } as const;
 export const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 export type RateLimited = { retryAfterSeconds: number };
+
+/** Which counter a check goes to, and its limit (decisions 44, 50). */
+export function rateLimitSubject(
+  userId: string | null,
+  ip: string | null,
+): { subject: string; limit: number } {
+  // Every demo visitor is the same user: by IP, as guests, they don't use up
+  // each other's checks.
+  if (userId !== null && !isDemoUser(userId)) {
+    return { subject: `user:${userId}`, limit: RATE_LIMITS.user };
+  }
+  // Without a known address all such callers share one counter: stricter,
+  // but never unlimited.
+  return { subject: `ip:${ip ?? "unknown"}`, limit: RATE_LIMITS.guest };
+}
 
 /** Fixed windows aligned to the hour, so every server agrees on the row. */
 export function windowStart(now: Date): Date {
