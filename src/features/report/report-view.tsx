@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { toPackageRowJson } from "@/server/check/package-row";
-import { summarizeRows } from "@/server/check/report-view";
+import { previousRowsFor, summarizeRows } from "@/server/check/report-view";
 import { getDb } from "@/server/db/client";
 import { getReportPage } from "@/server/db/report-page";
 import { checkAgain, retry } from "./actions";
@@ -29,12 +29,17 @@ export async function ReportView({
   const basePath = `/r/${report.id}`;
 
   const running = check?.status === "running";
+  const previousRows = previous
+    ? previousRowsFor(previous.rows, report.dependencies)
+    : [];
   // During "Check again" the previous results stay on screen until `done`;
   // during the first check there is nothing to summarize yet.
   const shown = running ? previous : check;
-  const summary = shown
-    ? summarizeRows(shown.rows, report.dependencies.length)
-    : undefined;
+  const shownRows = running ? previousRows : check?.rows;
+  const summary =
+    shown && shownRows
+      ? summarizeRows(shownRows, report.dependencies.length)
+      : undefined;
   // A report always gets its first check with it (createGuestReport), so no
   // check at all means something broke; "Try again" starts one.
   const failed = !check || check.status === "failed";
@@ -57,7 +62,7 @@ export async function ReportView({
         packageManager={report.packageManager}
         totalPackages={check?.totalPackages ?? report.dependencies.length}
         dependencies={report.dependencies}
-        previousRows={previous?.rows.map(toPackageRowJson) ?? []}
+        previousRows={previousRows.map(toPackageRowJson)}
         currentRows={check?.rows.map(toPackageRowJson) ?? []}
       >
         <ReportHeader

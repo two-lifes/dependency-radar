@@ -1,4 +1,5 @@
 import { SOURCE_FAILURE_REASONS } from "../analysis/check-outcome";
+import type { ReportInput } from "../analysis/report-input";
 import type { Result } from "../analysis/result";
 import type {
   CheckStore,
@@ -10,12 +11,16 @@ import { finishCheck } from "./run-check";
 // Server Actions (rate limit, ownership) call these; the SSE stream started
 // afterwards does the actual work.
 
-/** A new check of the report: "Check again" or the first check. */
+/**
+ * A new check of the report: "Check again" or the first check. `input` is the
+ * report input re-read from its repository (decisions 42).
+ */
 export function startCheck(
   store: CheckStore,
   reportId: string,
+  input?: ReportInput,
 ): Promise<Result<{ checkId: string }, CreateCheckError>> {
-  return store.createCheck(reportId);
+  return store.createCheck(reportId, input);
 }
 
 /** "Resume": checks only packages that have no result yet. */

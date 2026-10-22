@@ -89,23 +89,38 @@ export function createPgCheckStore(db: Db): CheckStore {
       return finished.length > 0;
     },
 
-    async createCheck(reportId) {
-      const [report] = await db
-        .select({ dependencies: reports.dependencies })
-        .from(reports)
-        .where(eq(reports.id, reportId))
-        .limit(1);
-      if (!report) return { ok: false, error: "report-not-found" };
-
+    async createCheck(reportId, input) {
       try {
-        const [check] = await db
-          .insert(checks)
-          .values({ reportId, totalPackages: report.dependencies.length })
-          .returning({ id: checks.id });
-        if (!check) throw new Error("Insert into checks returned no row");
-        return { ok: true, value: { checkId: check.id } };
+        return await db.transaction(async (tx) => {
+          const [report] = input
+            ? await tx
+                .update(reports)
+                .set({
+                  name: input.name ?? null,
+                  dependencies: input.dependencies,
+                  lockedVersions: input.lockedVersions,
+                  warnings: input.warnings,
+                  packageManager: input.packageManager,
+                })
+                .where(eq(reports.id, reportId))
+                .returning({ dependencies: reports.dependencies })
+            : await tx
+                .select({ dependencies: reports.dependencies })
+                .from(reports)
+                .where(eq(reports.id, reportId))
+                .limit(1);
+          if (!report) return { ok: false, error: "report-not-found" };
+
+          const [check] = await tx
+            .insert(checks)
+            .values({ reportId, totalPackages: report.dependencies.length })
+            .returning({ id: checks.id });
+          if (!check) throw new Error("Insert into checks returned no row");
+          return { ok: true, value: { checkId: check.id } };
+        });
       } catch (error) {
-        // checks_one_running_per_report_idx: a check of this report runs.
+        // checks_one_running_per_report_idx: a check of this report runs;
+        // the transaction rolls back the new input with it.
         if (isUniqueViolation(error)) {
           return { ok: false, error: "already-running" };
         }

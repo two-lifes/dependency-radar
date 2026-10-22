@@ -68,10 +68,17 @@ export function createMemoryCheckStore() {
       });
       return true;
     },
-    async createCheck(reportId) {
-      const input = reports.get(reportId);
-      if (!input) return { ok: false, error: "report-not-found" };
+    async createCheck(reportId, newInput) {
+      const stored = reports.get(reportId);
+      if (!stored) return { ok: false, error: "report-not-found" };
       if (runningFor(reportId)) return { ok: false, error: "already-running" };
+      const input = newInput
+        ? {
+            dependencies: newInput.dependencies,
+            lockedVersions: newInput.lockedVersions,
+          }
+        : stored;
+      reports.set(reportId, input);
       const id = `check-${nextId++}`;
       checks.set(id, {
         id,

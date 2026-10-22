@@ -6,13 +6,24 @@ import { checkPackages, checks, reports } from "./schema";
 
 export type ReportMeta = { id: string; expiresAt: Date | null };
 
-/** Enough to answer 404 and "expired" before the report itself loads. */
+/**
+ * Enough to answer 404 and "expired" before the report itself loads, and for
+ * "Check again" to know whether to re-read the repository.
+ */
 export async function getReportMeta(
   db: Db,
   reportId: string,
-): Promise<ReportMeta | undefined> {
+): Promise<
+  | (ReportMeta & Pick<typeof reports.$inferSelect, "source" | "repoUrl">)
+  | undefined
+> {
   const [report] = await db
-    .select({ id: reports.id, expiresAt: reports.expiresAt })
+    .select({
+      id: reports.id,
+      expiresAt: reports.expiresAt,
+      source: reports.source,
+      repoUrl: reports.repoUrl,
+    })
     .from(reports)
     .where(eq(reports.id, reportId))
     .limit(1);

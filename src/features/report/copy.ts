@@ -25,6 +25,8 @@ export const reportCopy = {
     save: "Save project",
     copyLink: "Copy link",
     checkAgain: "Check again",
+    // screens 5.4: "Check again" on a GitHub report re-reads the repository.
+    fetchingRepository: "Fetching repository…",
     more: "More actions",
     linkCopied: "Link copied",
     copyFailed: "Couldn't copy the link. Copy it from the address bar.",

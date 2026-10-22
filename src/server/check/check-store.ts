@@ -1,6 +1,7 @@
 import type { CheckFailureCode } from "../analysis/check-outcome";
 import type { LockedPackage } from "../analysis/parse-lockfile";
 import type { ManifestDependency } from "../analysis/parse-manifest";
+import type { ReportInput } from "../analysis/report-input";
 import type { UncheckedReason } from "../analysis/resolve-versions";
 import type { Result } from "../analysis/result";
 import type { FinishedCheckStatus } from "./events";
@@ -56,8 +57,13 @@ export type CheckStore = {
   releaseLease(checkId: string): Promise<void>;
   /** Finishes a running check and frees its lease; `false` if not running. */
   finish(checkId: string, snapshot: CheckSnapshot): Promise<boolean>;
+  /**
+   * With `input`, replaces the report input in the same transaction as the
+   * new check: a check that can't start leaves the input as it was.
+   */
   createCheck(
     reportId: string,
+    input?: ReportInput,
   ): Promise<Result<{ checkId: string }, CreateCheckError>>;
   /** Back to running, after deleting rows with `dropReasons`. */
   reopenCheck(

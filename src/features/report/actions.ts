@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { z } from "zod";
+import type { ReportInput } from "@/server/analysis/report-input";
 import {
   cancelCheck,
   resumeCheck,
@@ -14,12 +15,14 @@ import { getDb } from "@/server/db/client";
 import { getCheckReportMeta, getReportMeta } from "@/server/db/report-page";
 import { consumeCheck } from "@/server/rate-limit";
 import { tooManyChecks } from "../check/copy";
+import { readRepoInput } from "../check/read-repo";
 
 // screens 5.4 report actions. Every outcome ends in a refresh: the page reads
 // the check state from the database, so "already running", "not running" or
 // an expired report all show up there without a separate error message.
-// Only the rate limit (decisions 44) comes back as a message, for a toast:
-// nothing in the database changes then.
+// Only the rate limit (decisions 44) and a failed repository read
+// (decisions 42) come back as a message, for a toast: nothing in the database
+// changes then.
 
 export type ReportActionResult = { error?: string };
 
@@ -36,7 +39,15 @@ export async function checkAgain(
     if (!allowed.ok) {
       return { error: tooManyChecks(allowed.error.retryAfterSeconds) };
     }
-    await startCheck(createPgCheckStore(db), reportId);
+    // decisions 42: a repository report checks what the repository holds now.
+    // A failed read starts nothing and leaves the report as it was.
+    let input: ReportInput | undefined;
+    if (report.source === "github" && report.repoUrl) {
+      const read = await readRepoInput(report.repoUrl);
+      if (!read.ok) return { error: read.error };
+      input = read.value.input;
+    }
+    await startCheck(createPgCheckStore(db), reportId, input);
   }
   refresh();
   return {};

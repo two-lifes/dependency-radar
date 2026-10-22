@@ -49,6 +49,10 @@ export function ReportHeader({
   const { running } = useReport();
   const [pending, run] = useReportAction();
   const checkDisabled = running || pending;
+  const checkLabel =
+    pending && source.kind === "github"
+      ? copy.actions.fetchingRepository
+      : copy.actions.checkAgain;
 
   const onCheckAgain = () => run(() => checkAgain(reportId));
   const onCopyLink = async () => {
@@ -119,7 +123,7 @@ export function ReportHeader({
             ) : (
               <RefreshCw aria-hidden />
             )}
-            {copy.actions.checkAgain}
+            {checkLabel}
           </Button>
           {/* < 768px secondary actions move into a menu (screens 5.4). */}
           <DropdownMenu>
@@ -143,7 +147,7 @@ export function ReportHeader({
                 onSelect={onCheckAgain}
               >
                 <RefreshCw aria-hidden />
-                {copy.actions.checkAgain}
+                {checkLabel}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

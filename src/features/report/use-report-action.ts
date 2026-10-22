@@ -5,8 +5,9 @@ import { toast } from "@/components/ui/toast";
 import type { ReportActionResult } from "./actions";
 
 /**
- * Runs a report action that starts a check in a transition; its only message
- * (the rate limit) becomes a toast, since the page itself doesn't change.
+ * Runs a report action that starts a check in a transition; its message (the
+ * rate limit, a failed repository read) becomes a toast, since the page itself
+ * doesn't change.
  */
 export function useReportAction(): [
   pending: boolean,

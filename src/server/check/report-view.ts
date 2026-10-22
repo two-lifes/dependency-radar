@@ -23,6 +23,19 @@ export function pickChecks<T extends { status: string }>(
   };
 }
 
+/**
+ * Rows of the previous check shown during "Check again": only packages still
+ * in the report input, which the repository re-read may have changed
+ * (decisions 42), so removed packages don't stay until the check ends.
+ */
+export function previousRowsFor<T extends { name: string }>(
+  rows: readonly T[],
+  dependencies: readonly { name: string }[],
+): T[] {
+  const names = new Set(dependencies.map(({ name }) => name));
+  return rows.filter((row) => names.has(row.name));
+}
+
 export type ReportSummary = {
   score: HealthScore;
   counts: ReportCounts;
