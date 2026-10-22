@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   clientIp,
+  MAGIC_LINK_LIMITS,
+  magicLinkSubjects,
   RATE_LIMITS,
   rateLimitDecision,
   rateLimitSubject,
@@ -18,6 +20,13 @@ describe("windowStart", () => {
   it("keeps a time that is already on the hour", () => {
     expect(windowStart(new Date("2026-10-22T14:00:00.000Z"))).toEqual(
       new Date("2026-10-22T14:00:00.000Z"),
+    );
+  });
+
+  it("rounds down to a quarter hour for the email counter", () => {
+    const { windowMs } = MAGIC_LINK_LIMITS.email;
+    expect(windowStart(new Date("2026-10-22T14:37:12.345Z"), windowMs)).toEqual(
+      new Date("2026-10-22T14:30:00.000Z"),
     );
   });
 });
@@ -53,6 +62,30 @@ describe("rateLimitDecision", () => {
       ok: false,
       error: { retryAfterSeconds: 1 },
     });
+  });
+
+  it("sends 3 links to an email per 15 minutes", () => {
+    const { limit, windowMs } = MAGIC_LINK_LIMITS.email;
+    const quarter = new Date("2026-10-22T14:30:00.000Z");
+    const now = new Date("2026-10-22T14:35:00.000Z");
+    expect(rateLimitDecision(3, limit, quarter, now, windowMs).ok).toBe(true);
+    expect(rateLimitDecision(4, limit, quarter, now, windowMs)).toEqual({
+      ok: false,
+      error: { retryAfterSeconds: 10 * 60 },
+    });
+  });
+});
+
+describe("magicLinkSubjects", () => {
+  it("counts an email regardless of case and spaces", () => {
+    expect(magicLinkSubjects(" Ada@Example.com ", "203.0.113.7")).toEqual({
+      email: "magic-email:ada@example.com",
+      ip: "magic-ip:203.0.113.7",
+    });
+  });
+
+  it("puts callers without an address on one counter", () => {
+    expect(magicLinkSubjects("a@b.c", null).ip).toBe("magic-ip:unknown");
   });
 });
 

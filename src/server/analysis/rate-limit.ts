@@ -22,10 +22,33 @@ export function rateLimitSubject(
   return { subject: `ip:${ip ?? "unknown"}`, limit: RATE_LIMITS.guest };
 }
 
-/** Fixed windows aligned to the hour, so every server agrees on the row. */
-export function windowStart(now: Date): Date {
+/**
+ * plan.md 26.1: per email so one inbox can't be flooded, per IP so one
+ * visitor can't flood many inboxes.
+ */
+export const MAGIC_LINK_LIMITS = {
+  email: { limit: 3, windowMs: 15 * 60 * 1000 },
+  ip: { limit: 10, windowMs: RATE_LIMIT_WINDOW_MS },
+} as const;
+
+/** Counters of `sendMagicLink`, apart from the check counters. */
+export function magicLinkSubjects(
+  email: string,
+  ip: string | null,
+): { email: string; ip: string } {
+  return {
+    email: `magic-email:${email.trim().toLowerCase()}`,
+    ip: `magic-ip:${ip ?? "unknown"}`,
+  };
+}
+
+/** Fixed windows aligned to their length, so every server agrees on the row. */
+export function windowStart(
+  now: Date,
+  windowMs: number = RATE_LIMIT_WINDOW_MS,
+): Date {
   const ms = now.getTime();
-  return new Date(ms - (ms % RATE_LIMIT_WINDOW_MS));
+  return new Date(ms - (ms % windowMs));
 }
 
 /** `count` already includes this attempt. */
@@ -34,9 +57,10 @@ export function rateLimitDecision(
   limit: number,
   start: Date,
   now: Date,
+  windowMs: number = RATE_LIMIT_WINDOW_MS,
 ): Result<void, RateLimited> {
   if (count <= limit) return { ok: true, value: undefined };
-  const leftMs = start.getTime() + RATE_LIMIT_WINDOW_MS - now.getTime();
+  const leftMs = start.getTime() + windowMs - now.getTime();
   return {
     ok: false,
     error: { retryAfterSeconds: Math.max(1, Math.ceil(leftMs / 1000)) },

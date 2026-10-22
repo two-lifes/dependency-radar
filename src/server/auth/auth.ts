@@ -7,15 +7,21 @@ import {
 } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
+import { authCopy } from "@/features/auth/copy";
+import { clientIp } from "../analysis/rate-limit";
 import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
 import { isDemoUser } from "../demo/demo-user";
 import { isDemoAuthPathAllowed } from "./demo-guard";
 import { demoSignIn } from "./demo-sign-in";
+import { consumeMagicLink } from "./magic-link-limit";
 import { sendMagicLinkEmail } from "./magic-link-email";
 
 /** screens 5.3: "It expires in 15 minutes." */
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
+
+/** `sendSignInLink` tells this refusal apart from a failed send. */
+export const MAGIC_LINK_RATE_LIMITED = "MAGIC_LINK_RATE_LIMITED";
 
 // BETTER_AUTH_SECRET is read by Better Auth itself.
 function createAuth() {
@@ -86,7 +92,24 @@ function createAuth() {
     plugins: [
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,
-        sendMagicLink: ({ email, url }) => sendMagicLinkEmail({ email, url }),
+        // Here and not in `sendSignInLink`, so a direct POST to
+        // `/api/auth/sign-in/magic-link` is limited too.
+        sendMagicLink: async ({ email, url }, ctx) => {
+          const allowed = await consumeMagicLink(
+            getDb(),
+            email,
+            ctx?.headers ? clientIp(ctx.headers) : null,
+          );
+          if (!allowed.ok) {
+            throw new APIError("TOO_MANY_REQUESTS", {
+              code: MAGIC_LINK_RATE_LIMITED,
+              message: authCopy.errors.tooManyRequests(
+                allowed.error.retryAfterSeconds,
+              ),
+            });
+          }
+          await sendMagicLinkEmail({ email, url });
+        },
       }),
       demoSignIn(),
       // Sets cookies from Server Actions; Better Auth requires it last.

@@ -1,3 +1,5 @@
+import { minutesUntilRetry } from "../check/copy";
+
 // screens 5.2, 5.3 and 4.2
 export const authCopy = {
   login: {
@@ -20,6 +22,9 @@ export const authCopy = {
     sendFailed: "Couldn't send the link. Try again.",
     github: "GitHub sign-in was cancelled or failed. Try again.",
     linkExpired: "This link has expired. Request a new one.",
+    // plan.md 26.1: sign-in links per email and per IP.
+    tooManyRequests: (retryAfterSeconds: number) =>
+      `Too many requests. Try again in ${minutesUntilRetry(retryAfterSeconds)}.`,
   },
   checkEmail: {
     title: "Check your inbox",

@@ -1,10 +1,11 @@
 "use server";
 
+import { isAPIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { safeNext } from "@/lib/safe-next";
-import { getAuth } from "@/server/auth/auth";
+import { getAuth, MAGIC_LINK_RATE_LIMITED } from "@/server/auth/auth";
 import { authCopy } from "./copy";
 import { checkEmailPath, loginErrorPath } from "./login-paths";
 import type { SignInLinkState } from "./sign-in-state";
@@ -40,6 +41,13 @@ export async function sendSignInLink(
       headers: await headers(),
     });
   } catch (error) {
+    if (
+      isAPIError(error) &&
+      error.body?.code === MAGIC_LINK_RATE_LIMITED &&
+      error.body.message
+    ) {
+      return { attempt, error: error.body.message };
+    }
     console.error("[auth] couldn't send a sign-in link", error);
     return { attempt, error: authCopy.errors.sendFailed };
   }
