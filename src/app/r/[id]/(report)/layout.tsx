@@ -12,6 +12,8 @@ import { SystemMessage } from "@/features/system/system-message";
 import { isReportExpired } from "@/server/check/report-view";
 import { getDb } from "@/server/db/client";
 import { getReportMeta } from "@/server/db/report-page";
+import { canOpenReport } from "@/server/report-access";
+import { getOptionalSession } from "@/server/auth/session";
 
 const idSchema = z.uuid();
 
@@ -31,6 +33,12 @@ export default async function GuestReportLayout({
   if (!idSchema.safeParse(id).success) notFound();
   const meta = await getReportMeta(getDb(), id);
   if (!meta) notFound();
+  if (meta.projectId !== null) {
+    // decisions 45: a saved report is its project's now. The tab page
+    // redirects the owner there; everyone else gets the 404.
+    if (!(await canOpenReport(meta))) notFound();
+    return children;
+  }
 
   if (isReportExpired(meta.expiresAt, new Date())) {
     const copy = reportCopy.expired;
@@ -50,11 +58,14 @@ export default async function GuestReportLayout({
     );
   }
 
+  const session = await getOptionalSession();
   return (
     <>
       <SiteHeader />
       <Suspense fallback={<ReportSkeleton />}>
-        <ReportView reportId={id}>{children}</ReportView>
+        <ReportView reportId={id} mode={{ kind: "guest", signedIn: !!session }}>
+          {children}
+        </ReportView>
       </Suspense>
     </>
   );

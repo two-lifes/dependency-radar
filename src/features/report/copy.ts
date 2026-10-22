@@ -23,6 +23,9 @@ export const reportCopy = {
     `This report is public via link and expires on ${date}.`,
   actions: {
     save: "Save project",
+    saving: "Saving…",
+    projectSaved: "Project saved",
+    settings: "Project settings",
     copyLink: "Copy link",
     checkAgain: "Check again",
     // screens 5.4: "Check again" on a GitHub report re-reads the repository.

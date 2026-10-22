@@ -8,25 +8,44 @@ import { checkAgain, retry } from "./actions";
 import { CheckBanner, CheckFailed, CheckProgress } from "./check-status";
 import { checkFailureCopy } from "./copy";
 import { PackageCard } from "./package-card";
+import { ProjectSavedToast } from "./project-saved-toast";
 import { ReportProvider } from "./report-context";
-import { ReportHeader, type ReportSource } from "./report-header";
+import {
+  ReportHeader,
+  type ReportHeaderMode,
+  type ReportSource,
+} from "./report-header";
 import { ReportSummary, ReportSummarySkeleton } from "./report-summary";
 import { ReportTabs } from "./report-tabs";
 import { reportWarningCopy } from "./warning-copy";
 
-/** screens 5.4: everything above the tab content, plus the live state. */
+export type ReportViewMode =
+  | { kind: "guest"; signedIn: boolean }
+  | { kind: "project"; projectId: string; name: string };
+
+/**
+ * screens 5.4: everything above the tab content, plus the live state. The
+ * guest report and a project's report differ only in `mode`.
+ */
 export async function ReportView({
   reportId,
+  mode,
   children,
 }: {
   reportId: string;
+  mode: ReportViewMode;
   children: ReactNode;
 }) {
   const data = await getReportPage(getDb(), reportId);
   if (!data) notFound();
   const { report, check, previous } = data;
   const now = new Date();
-  const basePath = `/r/${report.id}`;
+  const basePath =
+    mode.kind === "project" ? `/projects/${mode.projectId}` : `/r/${report.id}`;
+  const headerMode: ReportHeaderMode =
+    mode.kind === "project"
+      ? { kind: "project", settingsHref: `${basePath}/settings` }
+      : { kind: "guest", signedIn: mode.signedIn };
 
   const running = check?.status === "running";
   const previousRows = previous
@@ -56,7 +75,7 @@ export async function ReportView({
       <ReportProvider
         key={`${check?.id}:${check?.status}`}
         reportId={report.id}
-        guest={report.expiresAt !== null}
+        guest={mode.kind === "guest"}
         checkId={check?.id}
         running={running}
         packageManager={report.packageManager}
@@ -67,7 +86,8 @@ export async function ReportView({
       >
         <ReportHeader
           reportId={report.id}
-          name={report.name}
+          mode={headerMode}
+          name={mode.kind === "project" ? mode.name : report.name}
           source={source}
           checkedAt={shown?.finishedAt?.toISOString() ?? null}
           expiresAt={report.expiresAt?.toISOString() ?? null}
@@ -115,6 +135,7 @@ export async function ReportView({
           </>
         )}
         <PackageCard />
+        {mode.kind === "project" ? <ProjectSavedToast /> : null}
       </ReportProvider>
     </main>
   );

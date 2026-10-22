@@ -3,6 +3,8 @@ import { encodeSseEvent, SSE_PING } from "@/server/check/events";
 import { serveCheck } from "@/server/check/serve-check";
 import { createPgCheckStore } from "@/server/db/check-store";
 import { getDb } from "@/server/db/client";
+import { getCheckReportMeta } from "@/server/db/report-page";
+import { canOpenReport } from "@/server/report-access";
 import { createPgCache } from "@/server/sources/cache";
 import { createLimiter } from "@/server/sources/limiter";
 
@@ -30,6 +32,9 @@ export async function GET(
 
   const db = getDb();
   const store = createPgCheckStore(db);
+  // A project's check streams only to its owner (decisions 45).
+  const report = await getCheckReportMeta(db, id);
+  if (!report || !(await canOpenReport(report))) return notFound();
   if (!(await store.getCheck(id))) return notFound();
 
   const closed = new AbortController();

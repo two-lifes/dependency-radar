@@ -14,6 +14,7 @@ import {
 import { isReportExpired } from "@/server/check/report-view";
 import { getDb } from "@/server/db/client";
 import { getReportPackage } from "@/server/db/report-page";
+import { canOpenReport } from "@/server/report-access";
 import { type Cache, createPgCache } from "@/server/sources/cache";
 import { fetchReleases } from "@/server/sources/github";
 import { createLimiter } from "@/server/sources/limiter";
@@ -53,8 +54,10 @@ async function loadCheckedPackage(
     input.data.name,
   );
   const row = found?.row;
+  if (!found || !(await canOpenReport(found.report))) {
+    return { ok: false, error: "not-found" };
+  }
   if (
-    !found ||
     isReportExpired(found.report.expiresAt, new Date()) ||
     !row?.checked ||
     row.registryName === null ||

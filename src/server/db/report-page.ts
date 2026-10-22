@@ -2,13 +2,26 @@ import { and, desc, eq } from "drizzle-orm";
 import type { CheckPackageRow } from "../check/package-row";
 import { pickChecks } from "../check/report-view";
 import type { Db } from "./client";
-import { checkPackages, checks, reports } from "./schema";
+import { checkPackages, checks, projects, reports } from "./schema";
 
-export type ReportMeta = { id: string; expiresAt: Date | null };
+/** `ownerId` comes with `projectId`, for `canAccessReport`. */
+export type ReportMeta = {
+  id: string;
+  expiresAt: Date | null;
+  projectId: string | null;
+  ownerId: string | null;
+};
+
+const metaColumns = {
+  id: reports.id,
+  expiresAt: reports.expiresAt,
+  projectId: reports.projectId,
+  ownerId: projects.ownerId,
+};
 
 /**
- * Enough to answer 404 and "expired" before the report itself loads, and for
- * "Check again" to know whether to re-read the repository.
+ * Enough to answer 404, "no access" and "expired" before the report itself
+ * loads, and for "Check again" to know whether to re-read the repository.
  */
 export async function getReportMeta(
   db: Db,
@@ -19,12 +32,12 @@ export async function getReportMeta(
 > {
   const [report] = await db
     .select({
-      id: reports.id,
-      expiresAt: reports.expiresAt,
+      ...metaColumns,
       source: reports.source,
       repoUrl: reports.repoUrl,
     })
     .from(reports)
+    .leftJoin(projects, eq(projects.id, reports.projectId))
     .where(eq(reports.id, reportId))
     .limit(1);
   return report;
@@ -36,9 +49,10 @@ export async function getCheckReportMeta(
   checkId: string,
 ): Promise<ReportMeta | undefined> {
   const [report] = await db
-    .select({ id: reports.id, expiresAt: reports.expiresAt })
+    .select(metaColumns)
     .from(checks)
     .innerJoin(reports, eq(reports.id, checks.reportId))
+    .leftJoin(projects, eq(projects.id, reports.projectId))
     .where(eq(checks.id, checkId))
     .limit(1);
   return report;

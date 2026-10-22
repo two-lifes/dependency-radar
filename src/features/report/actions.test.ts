@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GITHUB_API_URL } from "@/server/sources/github";
 import { setupMswServer } from "@/server/sources/test/msw-server";
-import { checkAgain, resume, retry } from "./actions";
+import { cancel, checkAgain, resume, retry, saveReport } from "./actions";
 
 const REPORT_ID = "0b6f3a52-4a43-4c4f-9a43-1f1f3c1b2a10";
 const CHECK_ID = "6c1e6a0e-2a55-4d0f-8a5c-3e1a8f4b9c21";
@@ -15,12 +15,31 @@ const state = vi.hoisted(() => ({
   ip: "203.0.113.7",
   report: {
     expiresAt: null,
+    projectId: null as string | null,
+    ownerId: null as string | null,
     source: "paste",
     repoUrl: null as string | null,
   },
 }));
 
+const guestPasteReport = {
+  expiresAt: null,
+  projectId: null,
+  ownerId: null,
+  source: "paste",
+  repoUrl: null,
+};
+
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((path: string) => {
+    throw new Error(`NEXT_REDIRECT ${path}`);
+  }),
+}));
+const projects = vi.hoisted(() => ({
+  saveGuestReport: vi.fn(),
+}));
+vi.mock("@/server/db/projects", () => projects);
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-real-ip": state.ip }),
 }));
@@ -31,7 +50,7 @@ vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/server/db/check-store", () => ({ createPgCheckStore: () => ({}) }));
 vi.mock("@/server/db/report-page", () => ({
   getReportMeta: async () => state.report,
-  getCheckReportMeta: async () => ({ expiresAt: null }),
+  getCheckReportMeta: async () => state.report,
 }));
 vi.mock("@/server/db/rate-limits", () => ({
   hitRateLimit: async (_db: unknown, subject: string, windowStart: Date) => {
@@ -154,7 +173,7 @@ describe("Check again on a GitHub report (decisions 42)", () => {
     state.counts.clear();
     state.session = null;
     state.report = {
-      expiresAt: null,
+      ...guestPasteReport,
       source: "github",
       repoUrl: "https://github.com/acme/shop",
     };
@@ -166,7 +185,7 @@ describe("Check again on a GitHub report (decisions 42)", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     server.events.removeAllListeners();
-    state.report = { expiresAt: null, source: "paste", repoUrl: null };
+    state.report = { ...guestPasteReport };
   });
 
   it("starts the check with the package.json the repository has now", async () => {
@@ -262,7 +281,7 @@ describe("Check again on a GitHub report (decisions 42)", () => {
   );
 
   it("doesn't read GitHub for a pasted report", async () => {
-    state.report = { expiresAt: null, source: "paste", repoUrl: null };
+    state.report = { ...guestPasteReport };
     const requests = countGithubRequests();
 
     expect(await checkAgain(REPORT_ID)).toEqual({});
@@ -284,5 +303,102 @@ describe("Check again on a GitHub report (decisions 42)", () => {
     expect(requests).toEqual([]);
     expect(control.resumeCheck).toHaveBeenCalledTimes(1);
     expect(control.retryFailed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a project's report (decisions 45)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-22T14:20:00.000Z"));
+    state.counts.clear();
+    state.report = { ...guestPasteReport, projectId: "p1", ownerId: "u1" };
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    state.session = null;
+    state.report = { ...guestPasteReport };
+  });
+
+  it("lets its owner check it", async () => {
+    state.session = { user: { id: "u1" } };
+
+    expect(await checkAgain(REPORT_ID)).toEqual({});
+    expect(await retry(CHECK_ID)).toEqual({});
+
+    expect(control.startCheck).toHaveBeenCalledTimes(1);
+    expect(control.retryFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["another user", { user: { id: "u2" } }],
+    ["a guest", null],
+  ])("starts nothing for %s and doesn't count it", async (_, session) => {
+    state.session = session;
+
+    expect(await checkAgain(REPORT_ID)).toEqual({});
+    expect(await resume(CHECK_ID)).toEqual({});
+    expect(await retry(CHECK_ID)).toEqual({});
+    expect(await cancel(CHECK_ID)).toEqual({});
+
+    expect(control.startCheck).not.toHaveBeenCalled();
+    expect(control.resumeCheck).not.toHaveBeenCalled();
+    expect(control.retryFailed).not.toHaveBeenCalled();
+    expect(control.cancelCheck).not.toHaveBeenCalled();
+    expect(state.counts.size).toBe(0);
+  });
+});
+
+describe("saveReport", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.session = { user: { id: "u1" } };
+  });
+
+  afterEach(() => {
+    state.session = null;
+  });
+
+  it("sends a guest to sign in and back to /r/[id]/save", async () => {
+    state.session = null;
+
+    await expect(saveReport(REPORT_ID)).rejects.toThrow(
+      `NEXT_REDIRECT /login?next=${encodeURIComponent(`/r/${REPORT_ID}/save`)}`,
+    );
+    expect(projects.saveGuestReport).not.toHaveBeenCalled();
+  });
+
+  it("opens the project with the saved toast", async () => {
+    projects.saveGuestReport.mockResolvedValue({
+      kind: "saved",
+      projectId: "p1",
+    });
+
+    await expect(saveReport(REPORT_ID)).rejects.toThrow(
+      "NEXT_REDIRECT /projects/p1/dependencies?saved=1",
+    );
+    expect(projects.saveGuestReport).toHaveBeenCalledWith(
+      expect.anything(),
+      REPORT_ID,
+      "u1",
+    );
+  });
+
+  it.each(["expired", "not-found"] as const)(
+    "goes back to the report when it is %s",
+    async (kind) => {
+      projects.saveGuestReport.mockResolvedValue({ kind });
+
+      await expect(saveReport(REPORT_ID)).rejects.toThrow(
+        `NEXT_REDIRECT /r/${REPORT_ID}/dependencies`,
+      );
+    },
+  );
+
+  it("ignores an invalid id", async () => {
+    await saveReport("not-a-uuid");
+
+    expect(projects.saveGuestReport).not.toHaveBeenCalled();
   });
 });

@@ -7,8 +7,10 @@ import {
   Loader2,
   MoreHorizontal,
   RefreshCw,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
+import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
 import { formatDayMonth } from "@/lib/format-time";
-import { checkAgain } from "./actions";
+import { checkAgain, saveReport } from "./actions";
 import { reportCopy } from "./copy";
 import { RelativeTime } from "./relative-time";
 import { useReport } from "./report-context";
@@ -29,9 +31,18 @@ const copy = reportCopy;
 export type ReportSource =
   { kind: "paste" | "upload" } | { kind: "github"; url: string };
 
-/** screens 5.4 guest report header. */
+export type ReportHeaderMode =
+  | { kind: "guest"; signedIn: boolean }
+  | { kind: "project"; settingsHref: string };
+
+/**
+ * screens 5.4 report header. Guest: "Save project", "Copy link", "Check
+ * again"; project: "Check again", "Copy link", "Settings". On mobile all but
+ * the first move into the "⋯" menu.
+ */
 export function ReportHeader({
   reportId,
+  mode,
   name,
   source,
   checkedAt,
@@ -39,6 +50,7 @@ export function ReportHeader({
   warnings,
 }: {
   reportId: string;
+  mode: ReportHeaderMode;
   name: string | null;
   source: ReportSource;
   /** When the shown results were checked; null before the first check ends. */
@@ -53,6 +65,10 @@ export function ReportHeader({
     pending && source.kind === "github"
       ? copy.actions.fetchingRepository
       : copy.actions.checkAgain;
+
+  const [saving, startSaving] = useTransition();
+  // saveReport ends in a redirect to the project.
+  const onSave = () => startSaving(() => saveReport(reportId));
 
   const onCheckAgain = () => run(() => checkAgain(reportId));
   const onCopyLink = async () => {
@@ -98,12 +114,27 @@ export function ReportHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button asChild>
-            {/* Sign-in and saving come in tasks 20 and 22. */}
-            <Link href={`/login?next=/r/${reportId}/save`}>
-              {copy.actions.save}
-            </Link>
-          </Button>
+          {mode.kind === "project" ? (
+            <Button disabled={checkDisabled} onClick={onCheckAgain}>
+              {pending ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw aria-hidden />
+              )}
+              {checkLabel}
+            </Button>
+          ) : mode.signedIn ? (
+            <Button disabled={saving} onClick={onSave}>
+              {saving ? <Loader2 className="animate-spin" aria-hidden /> : null}
+              {saving ? copy.actions.saving : copy.actions.save}
+            </Button>
+          ) : (
+            <Button asChild>
+              <Link href={`/login?next=/r/${reportId}/save`}>
+                {copy.actions.save}
+              </Link>
+            </Button>
+          )}
           <Button
             variant="secondary"
             className="max-md:hidden"
@@ -112,19 +143,32 @@ export function ReportHeader({
             <Link2 aria-hidden />
             {copy.actions.copyLink}
           </Button>
-          <Button
-            variant="secondary"
-            className="max-md:hidden"
-            disabled={checkDisabled}
-            onClick={onCheckAgain}
-          >
-            {pending ? (
-              <Loader2 className="animate-spin" aria-hidden />
-            ) : (
-              <RefreshCw aria-hidden />
-            )}
-            {checkLabel}
-          </Button>
+          {mode.kind === "project" ? (
+            <Button
+              asChild
+              variant="secondary"
+              size="icon"
+              className="max-md:hidden"
+            >
+              <Link href={mode.settingsHref} aria-label={copy.actions.settings}>
+                <Settings aria-hidden />
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              className="max-md:hidden"
+              disabled={checkDisabled}
+              onClick={onCheckAgain}
+            >
+              {pending ? (
+                <Loader2 className="animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw aria-hidden />
+              )}
+              {checkLabel}
+            </Button>
+          )}
           {/* < 768px secondary actions move into a menu (screens 5.4). */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -142,13 +186,22 @@ export function ReportHeader({
                 <Link2 aria-hidden />
                 {copy.actions.copyLink}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={checkDisabled}
-                onSelect={onCheckAgain}
-              >
-                <RefreshCw aria-hidden />
-                {checkLabel}
-              </DropdownMenuItem>
+              {mode.kind === "project" ? (
+                <DropdownMenuItem asChild>
+                  <Link href={mode.settingsHref}>
+                    <Settings aria-hidden />
+                    {copy.actions.settings}
+                  </Link>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  disabled={checkDisabled}
+                  onSelect={onCheckAgain}
+                >
+                  <RefreshCw aria-hidden />
+                  {checkLabel}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
