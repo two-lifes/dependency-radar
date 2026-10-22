@@ -191,6 +191,82 @@ export function fetchGithubLogin(
   );
 }
 
+/** A row of the repository list on `/projects/new` (screens 5.11.1). */
+export type GithubUserRepo = {
+  name: string;
+  fullName: string;
+  url: string;
+  description?: string;
+  language?: string;
+  pushedAt?: string;
+};
+
+// screens 5.11.1: the 100 most recently pushed, the most GitHub gives per page.
+const USER_REPOS_PER_PAGE = 100;
+
+const userReposResponseSchema = z.array(
+  z.object({
+    name: z.string(),
+    full_name: z.string(),
+    html_url: z.string(),
+    description: z.string().nullish(),
+    language: z.string().nullish(),
+    pushed_at: z.string().nullish(),
+    private: z.boolean(),
+    fork: z.boolean(),
+    archived: z.boolean(),
+  }),
+);
+
+const userReposSchema: z.ZodType<GithubUserRepo[]> = z.array(
+  z.object({
+    name: z.string(),
+    fullName: z.string(),
+    url: z.string(),
+    description: z.string().optional(),
+    language: z.string().optional(),
+    pushedAt: z.string().optional(),
+  }),
+);
+
+/**
+ * The user's own public repositories, most recently pushed first, without
+ * forks and archived ones (decisions 48). Filtered after the page is read, so
+ * fewer than 100 may come back.
+ */
+export function fetchGithubUserRepos(
+  login: string,
+  options: GithubClientOptions & { cache: Cache },
+): Promise<Result<GithubUserRepo[], SourceError>> {
+  return withCache(
+    options.cache,
+    `github:repos:${login}`.toLowerCase(),
+    userReposSchema,
+    async () => {
+      const result = await fetchJson(
+        `${GITHUB_API_URL}/users/${encodeURIComponent(login)}/repos?type=owner&sort=pushed&per_page=${USER_REPOS_PER_PAGE}`,
+        userReposResponseSchema,
+        request(options),
+      );
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        value: result.value
+          // spec 9: only public data, even if the server token sees more.
+          .filter((repo) => !repo.private && !repo.fork && !repo.archived)
+          .map((repo) => ({
+            name: repo.name,
+            fullName: repo.full_name,
+            url: repo.html_url,
+            description: repo.description ?? undefined,
+            language: repo.language ?? undefined,
+            pushedAt: repo.pushed_at ?? undefined,
+          })),
+      };
+    },
+  );
+}
+
 const JSON_MEDIA = "application/vnd.github+json";
 const RAW = "application/vnd.github.raw+json";
 

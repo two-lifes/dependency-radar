@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw/http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchGithubLogin,
+  fetchGithubUserRepos,
   fetchReleases,
   fetchRepoSource,
   GITHUB_API_URL,
@@ -377,5 +378,117 @@ describe("fetchGithubLogin", () => {
       ok: false,
       error: { code: "invalid-response" },
     });
+  });
+});
+
+describe("fetchGithubUserRepos", () => {
+  const reposUrl = `${GITHUB_API_URL}/users/Octocat/repos`;
+
+  const repoJson = (name: string, extra: Record<string, unknown> = {}) => ({
+    name,
+    full_name: `Octocat/${name}`,
+    html_url: `https://github.com/Octocat/${name}`,
+    description: null,
+    language: null,
+    pushed_at: "2026-10-19T10:00:00Z",
+    private: false,
+    fork: false,
+    archived: false,
+    ...extra,
+  });
+
+  it("asks for own repositories by push date and caches the answer", async () => {
+    const urls: URL[] = [];
+    server.use(
+      http.get(reposUrl, ({ request }) => {
+        urls.push(new URL(request.url));
+        return HttpResponse.json([
+          repoJson("shop", {
+            description: "Storefront",
+            language: "TypeScript",
+          }),
+        ]);
+      }),
+    );
+    const { cache, entries } = createMemoryCache();
+    const client = { cache, token: "t0ken", http: http0 };
+
+    const result = await fetchGithubUserRepos("Octocat", client);
+    const again = await fetchGithubUserRepos("Octocat", client);
+
+    const expected = {
+      ok: true,
+      value: [
+        {
+          name: "shop",
+          fullName: "Octocat/shop",
+          url: "https://github.com/Octocat/shop",
+          description: "Storefront",
+          language: "TypeScript",
+          pushedAt: "2026-10-19T10:00:00Z",
+        },
+      ],
+    };
+    expect(result).toEqual(expected);
+    expect(again).toEqual(expected);
+    expect(urls).toHaveLength(1);
+    expect(Object.fromEntries(urls[0]?.searchParams ?? [])).toEqual({
+      type: "owner",
+      sort: "pushed",
+      per_page: "100",
+    });
+    expect([...entries.keys()]).toEqual(["github:repos:octocat"]);
+  });
+
+  it("drops forks, archived and private repositories", async () => {
+    server.use(
+      http.get(reposUrl, () =>
+        HttpResponse.json([
+          repoJson("own"),
+          repoJson("forked", { fork: true }),
+          repoJson("old", { archived: true }),
+          repoJson("secret", { private: true }),
+        ]),
+      ),
+    );
+    const { cache } = createMemoryCache();
+
+    const result = await fetchGithubUserRepos("Octocat", {
+      cache,
+      http: http0,
+    });
+
+    expect(result.ok && result.value.map((repo) => repo.name)).toEqual(["own"]);
+  });
+
+  it("returns an empty list for a user without public repositories", async () => {
+    server.use(http.get(reposUrl, () => HttpResponse.json([])));
+    const { cache } = createMemoryCache();
+
+    expect(
+      await fetchGithubUserRepos("Octocat", { cache, http: http0 }),
+    ).toEqual({ ok: true, value: [] });
+  });
+
+  it("reports the GitHub rate limit and caches nothing", async () => {
+    server.use(
+      http.get(
+        reposUrl,
+        () =>
+          new HttpResponse(null, {
+            status: 429,
+            headers: { "retry-after": "300" },
+          }),
+      ),
+    );
+    const { cache, entries } = createMemoryCache();
+
+    expect(
+      await fetchGithubUserRepos("Octocat", { cache, http: http0 }),
+    ).toEqual({
+      ok: false,
+      error: { code: "rate-limited", retryAfterSeconds: 300 },
+    });
+    expect(entries.size).toBe(0);
   });
 });

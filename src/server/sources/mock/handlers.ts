@@ -207,6 +207,46 @@ function mockReleases(name: string) {
     }));
 }
 
+// screens 5.11.1: whoever connected GitHub is "mock-user" with these
+// repositories; the fork and the archived one must not show up.
+const MOCK_LOGIN = "mock-user";
+const MOCK_USER_REPOS = [
+  ["shop-frontend", "Storefront on Next.js", "TypeScript", 2],
+  ["admin-dashboard", "Internal admin panel", "TypeScript", 9],
+  ["legacy-widget", null, "JavaScript", 40],
+  ["design-tokens", "Colors, spacing and type scale", "CSS", 75],
+  ["api-gateway", "Edge proxy for the public API", "Go", 120],
+  ["dotfiles", null, null, 400],
+] as const;
+
+function mockUserRepos(login: string) {
+  const day = 24 * 60 * 60 * 1000;
+  const repo = (
+    name: string,
+    description: string | null,
+    language: string | null,
+    daysAgo: number,
+    extra: { fork?: boolean; archived?: boolean } = {},
+  ) => ({
+    name,
+    full_name: `${login}/${name}`,
+    html_url: `https://github.com/${login}/${name}`,
+    description,
+    language,
+    pushed_at: new Date(Date.now() - daysAgo * day).toISOString(),
+    private: false,
+    fork: extra.fork ?? false,
+    archived: extra.archived ?? false,
+  });
+  return [
+    ...MOCK_USER_REPOS.map(([name, description, language, daysAgo]) =>
+      repo(name, description, language, daysAgo),
+    ),
+    repo("react", "A fork", "JavaScript", 5, { fork: true }),
+    repo("old-site", null, "HTML", 900, { archived: true }),
+  ];
+}
+
 const batchSchema = z.object({
   queries: z.array(
     z.object({
@@ -276,6 +316,15 @@ export const mockHandlers = [
       return HttpResponse.json(mockReleases(name));
     },
   ),
+
+  http.get(`${GITHUB_API_URL}/user/:id`, ({ params }) =>
+    HttpResponse.json({ login: MOCK_LOGIN, id: Number(params.id) }),
+  ),
+
+  http.get(`${GITHUB_API_URL}/users/:login/repos`, async ({ params }) => {
+    await slow();
+    return HttpResponse.json(mockUserRepos(String(params.login)));
+  }),
 
   http.get(`${OSV_API_URL}/vulns/:id`, ({ params }) => {
     const vuln = VULNERABILITIES.find(({ id }) => id === params.id);
