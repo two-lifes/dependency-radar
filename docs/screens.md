@@ -377,18 +377,24 @@ N — выделенные пакеты, которые попадут в ком
 
 ### 5.12. Настройки проекта `/projects/[id]/settings` [MVP]
 
-Ссылка «← Back to report». Секции, у каждой своя кнопка «Save»:
-1. «General»: имя проекта.
-2. «Source»: текущий источник и «Replace source» (та же форма из трёх вариантов). Перед заменой подтверждение «This will run a new check. History is kept.»
+Ссылка «← Back to report», заголовок «Project settings», ширина до 720px. Секции, у каждой своя кнопка «Save»:
+1. «General»: имя проекта (те же правила, что в 5.11). «Save» неактивна, пока имя не изменено; после сохранения тост «Project renamed».
+2. «Source»: текущий источник (репозиторий — ссылка, иначе «Pasted manually» / «package.json upload») и «Replace source», которая раскрывает ту же форму из трёх вариантов с «Save» и «Cancel». Пустое поле отмечается сразу, без подтверждения. Перед заменой подтверждение «Replace source?» / «This will run a new check. History is kept.» / «Replace & check» → `/projects/[id]/dependencies` с уже запущенной проверкой. Ошибки — под полем, как на лендинге (5.1), включая лимит проверок; если проверка проекта уже идёт — «A check is running. Wait for it to finish, then replace the source.»
 3. [1.2] «Schedule»: частота проверок.
 4. [1.1] «Ignored packages»: список с причинами и «Remove».
-5. «Danger zone» (красная рамка): «Delete project» → диалог подтверждения с вводом имени проекта → `/projects`, тост «Project deleted».
+5. «Danger zone» (красная рамка): «Delete project» → диалог подтверждения с вводом имени проекта (тот же, что в меню карточки) → `/projects`, тост «Project deleted».
+
+**Состояния:** загрузка — скелетон трёх секций; ошибка — «Couldn't load project settings. Retry»; чужой проект — 404.
 
 ### 5.13. Настройки аккаунта `/settings/*`
 
 Слева вертикальное меню разделов (на мобильных — вкладки сверху): «Profile» [MVP], «Notifications» [1.2], «Team» [1.2].
 
-- **Profile [MVP]:** имя, email (только чтение), GitHub («Connected as @user» или «Connect GitHub»), «Theme»: Light / Dark / System, «Danger zone»: «Delete account» с подтверждением вводом email.
+- **Profile [MVP]:** секции карточками:
+  - «Account»: «Name» (до 60 символов, может быть пустым — тогда в шапке email) с «Save», тост «Name saved»; «Email» только для чтения;
+  - «GitHub»: «Connected as @user» (логин не прочитался — «Connected to GitHub») или подсказка «Connect GitHub to import your repositories.» и кнопка «Connect GitHub» (возврат на эту же страницу). Сбой или аккаунт GitHub уже привязан к другому пользователю — «Couldn't connect GitHub. It may already be connected to another account.»;
+  - «Theme»: Light / Dark / System, применяется сразу, без «Save»;
+  - «Danger zone»: «Delete account» → диалог «Delete account?» с вводом email (регистр не важен) → лендинг, тост «Account deleted». Если вход был больше суток назад — «For security, sign in again to delete your account.» и кнопка «Sign in again» (выход и `/login?next=/settings/profile`).
 - **Notifications [1.2]:** таблица «событие × канал» (In-app / Email) с переключателями: «New vulnerability», «Major release of a watched package», «Snooze expired», «Check failed»; «Weekly digest» вкл/выкл и день недели.
 - **Team [1.2]:** название команды; участники (аватар, имя, email, роль «Owner» / «Member», «Remove»); «Invite member» (email + «Send invite»); ожидающие приглашения с «Resend» и «Revoke».
 
