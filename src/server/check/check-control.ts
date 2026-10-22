@@ -5,6 +5,7 @@ import type {
   CheckStore,
   CreateCheckError,
   ReopenCheckError,
+  ReportOrigin,
 } from "./check-store";
 import { finishCheck } from "./run-check";
 
@@ -13,14 +14,16 @@ import { finishCheck } from "./run-check";
 
 /**
  * A new check of the report: "Check again" or the first check. `input` is the
- * report input re-read from its repository (decisions 42).
+ * report input re-read from its repository (decisions 42), or from a new
+ * source with its `origin` ("Replace source").
  */
 export function startCheck(
   store: CheckStore,
   reportId: string,
   input?: ReportInput,
+  origin?: ReportOrigin,
 ): Promise<Result<{ checkId: string }, CreateCheckError>> {
-  return store.createCheck(reportId, input);
+  return store.createCheck(reportId, input, origin);
 }
 
 /** "Resume": checks only packages that have no result yet. */

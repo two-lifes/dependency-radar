@@ -12,6 +12,8 @@ import {
   createProjectWithCheck,
   deleteProject,
   getProjectCheckState,
+  getProjectSettings,
+  renameProject as renameProjectInDb,
 } from "@/server/db/projects";
 import { consumeCheck } from "@/server/rate-limit";
 import { tooManyChecks } from "../check/copy";
@@ -20,6 +22,8 @@ import { readRepoInput } from "../check/read-repo";
 import { landingCopy } from "../landing/copy";
 import { newProjectCopy, PROJECT_NAME_MAX } from "./copy";
 import type { NewProjectState } from "./new-project-state";
+import { projectSettingsCopy } from "../project-settings/copy";
+import type { ReplaceSourceState } from "../project-settings/replace-source-state";
 
 const idSchema = z.uuid();
 
@@ -28,20 +32,32 @@ const nameSchema = z
   .trim()
   .max(PROJECT_NAME_MAX, newProjectCopy.errors.nameTooLong);
 
+const pasteSchema = z.object({
+  source: z.literal("paste"),
+  packageJson: z.string(),
+});
+const uploadSchema = z.object({
+  source: z.literal("upload"),
+  packageJson: z.string(),
+  lockfile: z.instanceof(Blob).optional(),
+});
+const githubSchema = z.object({ source: z.literal("github"), url: z.string() });
+
+const requiredName = {
+  name: nameSchema.min(1, newProjectCopy.errors.nameRequired),
+};
+
 const formSchema = z.discriminatedUnion("source", [
-  z.object({
-    source: z.literal("paste"),
-    name: nameSchema.min(1, newProjectCopy.errors.nameRequired),
-    packageJson: z.string(),
-  }),
-  z.object({
-    source: z.literal("upload"),
-    name: nameSchema.min(1, newProjectCopy.errors.nameRequired),
-    packageJson: z.string(),
-    lockfile: z.instanceof(Blob).optional(),
-  }),
+  pasteSchema.extend(requiredName),
+  uploadSchema.extend(requiredName),
   // Empty takes the name from package.json, then the repository's.
-  z.object({ source: z.literal("github"), name: nameSchema, url: z.string() }),
+  githubSchema.extend({ name: nameSchema }),
+]);
+
+const sourceSchema = z.discriminatedUnion("source", [
+  pasteSchema,
+  uploadSchema,
+  githubSchema,
 ]);
 
 /** screens 5.11 "Create & check": the project with its first check running. */
@@ -172,4 +188,94 @@ export async function removeProject(
   const ok = await deleteProject(getDb(), projectId, user.id);
   refresh();
   return { ok };
+}
+
+/** screens 5.12 "General": `{ error }` is a message for the name field. */
+export async function renameProject(
+  projectId: string,
+  name: string,
+): Promise<{ error?: string }> {
+  const parsed = nameSchema
+    .min(1, newProjectCopy.errors.nameRequired)
+    .safeParse(name);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message };
+  }
+  if (!idSchema.safeParse(projectId).success) {
+    return { error: projectSettingsCopy.general.failed };
+  }
+  const { user } = await requireSession();
+  const renamed = await renameProjectInDb(
+    getDb(),
+    projectId,
+    user.id,
+    parsed.data,
+  );
+  if (!renamed) return { error: projectSettingsCopy.general.failed };
+  refresh();
+  return {};
+}
+
+/**
+ * screens 5.12 "Replace source", after "This will run a new check": the new
+ * input, its source and the check start in one transaction (createCheck), so
+ * a check that can't start leaves the project as it was. Checks so far stay
+ * in the history of the same report.
+ */
+export async function replaceSource(
+  projectId: string,
+  state: ReplaceSourceState,
+  formData: FormData,
+): Promise<ReplaceSourceState> {
+  const attempt = state.attempt + 1;
+  const { user } = await requireSession();
+  const parsed = sourceSchema.safeParse(Object.fromEntries(formData));
+  const db = getDb();
+  const project = idSchema.safeParse(projectId).success
+    ? await getProjectSettings(db, projectId, user.id)
+    : undefined;
+  if (!parsed.success || !project) {
+    // The form only sends valid fields for its own project.
+    return {
+      attempt,
+      error: { field: "paste", message: landingCopy.errors.generic },
+    };
+  }
+  const form = parsed.data;
+
+  const allowed = await consumeCheck();
+  if (!allowed.ok) {
+    return {
+      attempt,
+      error: {
+        field: form.source,
+        message: tooManyChecks(allowed.error.retryAfterSeconds),
+      },
+    };
+  }
+
+  const outcome = await prepareReport(form);
+  if (!outcome.ok) {
+    return { attempt, error: { field: form.source, message: outcome.message } };
+  }
+  const { source, repoUrl, input } = outcome.report;
+  const started = await startCheck(
+    createPgCheckStore(db),
+    project.reportId,
+    input,
+    { source, repoUrl: repoUrl ?? null },
+  );
+  if (!started.ok) {
+    return {
+      attempt,
+      error: {
+        field: form.source,
+        message:
+          started.error === "already-running"
+            ? projectSettingsCopy.source.alreadyRunning
+            : landingCopy.errors.generic,
+      },
+    };
+  }
+  redirect(`/projects/${projectId}/dependencies`);
 }

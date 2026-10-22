@@ -131,6 +131,50 @@ export function createProjectWithCheck(
   });
 }
 
+export type ProjectSettings = {
+  id: string;
+  name: string;
+  reportId: string;
+  source: (typeof reports.$inferSelect)["source"];
+  repoUrl: string | null;
+};
+
+/** screens 5.12: what the settings page shows, only for the project's owner. */
+export async function getProjectSettings(
+  db: Db,
+  projectId: string,
+  userId: string,
+): Promise<ProjectSettings | undefined> {
+  const [found] = await db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      reportId: reports.id,
+      source: reports.source,
+      repoUrl: reports.repoUrl,
+    })
+    .from(projects)
+    .innerJoin(reports, eq(reports.projectId, projects.id))
+    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .limit(1);
+  return found;
+}
+
+/** Renames an owned project; `false` if it isn't this user's. */
+export async function renameProject(
+  db: Db,
+  projectId: string,
+  userId: string,
+  name: string,
+): Promise<boolean> {
+  const renamed = await db
+    .update(projects)
+    .set({ name, updatedAt: new Date() })
+    .where(and(eq(projects.id, projectId), eq(projects.ownerId, userId)))
+    .returning({ id: projects.id });
+  return renamed.length > 0;
+}
+
 /** Deletes an owned project; its report and checks go with it (cascade). */
 export async function deleteProject(
   db: Db,

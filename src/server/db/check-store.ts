@@ -89,7 +89,7 @@ export function createPgCheckStore(db: Db): CheckStore {
       return finished.length > 0;
     },
 
-    async createCheck(reportId, input) {
+    async createCheck(reportId, input, origin) {
       try {
         return await db.transaction(async (tx) => {
           const [report] = input
@@ -101,6 +101,7 @@ export function createPgCheckStore(db: Db): CheckStore {
                   lockedVersions: input.lockedVersions,
                   warnings: input.warnings,
                   packageManager: input.packageManager,
+                  ...origin,
                 })
                 .where(eq(reports.id, reportId))
                 .returning({ dependencies: reports.dependencies })

@@ -1,12 +1,28 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createProject, queueCheck, removeProject } from "./actions";
+import { initialReplaceSourceState } from "../project-settings/replace-source-state";
+import {
+  createProject,
+  queueCheck,
+  removeProject,
+  renameProject,
+  replaceSource,
+} from "./actions";
 import { initialNewProjectState } from "./new-project-state";
 
 const PROJECT_ID = "0b6f3a52-4a43-4c4f-9a43-1f1f3c1b2a10";
 
 const state = vi.hoisted(() => ({
   count: 0,
+  settings: undefined as
+    | {
+        id: string;
+        name: string;
+        reportId: string;
+        source: "paste" | "upload" | "github";
+        repoUrl: string | null;
+      }
+    | undefined,
   project: undefined as
     | {
         reportId: string;
@@ -39,10 +55,19 @@ const db = vi.hoisted(() => ({
   createProjectWithCheck: vi.fn(async () => ({ projectId: "p-new" })),
   deleteProject: vi.fn(async () => true),
   getProjectCheckState: vi.fn(async () => state.project),
+  getProjectSettings: vi.fn(async () => state.settings),
+  renameProject: vi.fn(async () => true),
 }));
 vi.mock("@/server/db/projects", () => db);
 const control = vi.hoisted(() => ({
-  startCheck: vi.fn(async () => ({ ok: true, value: { checkId: "c-new" } })),
+  startCheck: vi.fn<
+    (
+      ...args: unknown[]
+    ) => Promise<
+      | { ok: true; value: { checkId: string } }
+      | { ok: false; error: "already-running" | "report-not-found" }
+    >
+  >(async () => ({ ok: true, value: { checkId: "c-new" } })),
   resumeCheck: vi.fn(async () => ({ ok: true, value: undefined })),
 }));
 vi.mock("@/server/check/check-control", () => control);
@@ -257,5 +282,127 @@ describe("removeProject", () => {
 
     expect(await removeProject(PROJECT_ID)).toEqual({ ok: true });
     expect(db.deleteProject).toHaveBeenCalledWith({}, PROJECT_ID, "u1");
+  });
+});
+
+describe("renameProject", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("saves a trimmed name for the owner", async () => {
+    expect(await renameProject(PROJECT_ID, "  New name ")).toEqual({});
+    expect(db.renameProject).toHaveBeenCalledWith(
+      {},
+      PROJECT_ID,
+      "u1",
+      "New name",
+    );
+  });
+
+  it("rejects an empty or too long name without saving", async () => {
+    expect(await renameProject(PROJECT_ID, "   ")).toEqual({
+      error: "Enter a project name.",
+    });
+    expect(await renameProject(PROJECT_ID, "x".repeat(61))).toEqual({
+      error: "Use 60 characters or fewer.",
+    });
+    expect(db.renameProject).not.toHaveBeenCalled();
+  });
+
+  it("fails for someone else's project", async () => {
+    db.renameProject.mockResolvedValueOnce(false);
+    expect(await renameProject(PROJECT_ID, "Mine now")).toEqual({
+      error: "Couldn't rename the project. Try again.",
+    });
+  });
+});
+
+describe("replaceSource", () => {
+  beforeEach(() => {
+    state.count = 0;
+    state.settings = {
+      id: PROJECT_ID,
+      name: "shop",
+      reportId: "r1",
+      source: "github",
+      repoUrl: "https://github.com/acme/shop",
+    };
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    state.settings = undefined;
+  });
+
+  const replace = (fields: Record<string, string>) =>
+    replaceSource(PROJECT_ID, initialReplaceSourceState, form(fields));
+
+  it("checks the pasted package.json as the new source and opens the report", async () => {
+    await expect(
+      replace({ source: "paste", packageJson: MANIFEST }),
+    ).rejects.toThrow(`redirect:/projects/${PROJECT_ID}/dependencies`);
+    expect(control.startCheck).toHaveBeenCalledWith(
+      {},
+      "r1",
+      expect.objectContaining({ name: "shop" }),
+      { source: "paste", repoUrl: null },
+    );
+    expect(state.count).toBe(1);
+  });
+
+  it("switches to a repository, keeping its normalized URL", async () => {
+    github.fetchRepoSource.mockResolvedValue(repoSource(MANIFEST));
+    await expect(
+      replace({ source: "github", url: "https://github.com/acme/web" }),
+    ).rejects.toThrow("redirect:");
+    expect(control.startCheck).toHaveBeenCalledWith(
+      {},
+      "r1",
+      expect.anything(),
+      { source: "github", repoUrl: "https://github.com/acme/web" },
+    );
+  });
+
+  it("shows a source error under the field and starts nothing", async () => {
+    const result = await replace({ source: "paste", packageJson: "{" });
+    expect(result).toEqual({
+      attempt: 1,
+      error: { field: "paste", message: expect.any(String) },
+    });
+    expect(control.startCheck).not.toHaveBeenCalled();
+  });
+
+  it("stops at the rate limit before reading the source", async () => {
+    state.count = 30;
+    const result = await replace({
+      source: "github",
+      url: "https://github.com/acme/web",
+    });
+    expect(result.error).toEqual({
+      field: "github",
+      message: expect.stringContaining("Too many checks"),
+    });
+    expect(github.fetchRepoSource).not.toHaveBeenCalled();
+    expect(control.startCheck).not.toHaveBeenCalled();
+  });
+
+  it("asks to wait while a check of the project runs", async () => {
+    control.startCheck.mockResolvedValueOnce({
+      ok: false,
+      error: "already-running",
+    });
+    const result = await replace({ source: "paste", packageJson: MANIFEST });
+    expect(result.error).toEqual({
+      field: "paste",
+      message:
+        "A check is running. Wait for it to finish, then replace the source.",
+    });
+  });
+
+  it("treats someone else's project as missing, before counting a check", async () => {
+    state.settings = undefined;
+    const result = await replace({ source: "paste", packageJson: MANIFEST });
+    expect(result.error?.message).toBe("Something went wrong. Try again.");
+    expect(state.count).toBe(0);
+    expect(control.startCheck).not.toHaveBeenCalled();
   });
 });

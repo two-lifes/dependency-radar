@@ -1,22 +1,26 @@
-import { notFound } from "next/navigation";
-import { z } from "zod";
-import { authCopy } from "@/features/auth/copy";
-import { StubPage } from "@/features/auth/stub-page";
-import { requireSession } from "@/server/auth/session";
-import { getDb } from "@/server/db/client";
-import { getProjectReportMeta } from "@/server/db/projects";
+import { DangerZone } from "@/features/project-settings/danger-zone";
+import { GeneralSection } from "@/features/project-settings/general-section";
+import { loadProjectSettings } from "@/features/project-settings/load-project";
+import { ProjectSettingsLayout } from "@/features/project-settings/settings-layout";
+import { SourceSection } from "@/features/project-settings/source-section";
 
-const idSchema = z.uuid();
-
-// Project settings come in plan task 24; the dashboard menu links here now.
+/** screens 5.12; access is checked by the layout (decisions 45). */
 export default async function ProjectSettingsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  if (!idSchema.safeParse(id).success) notFound();
-  const { user } = await requireSession();
-  if (!(await getProjectReportMeta(getDb(), id, user.id))) notFound();
-  return <StubPage title={authCopy.stub.projectSettings} />;
+  const project = await loadProjectSettings((await params).id);
+
+  return (
+    <ProjectSettingsLayout projectId={project.id}>
+      <GeneralSection projectId={project.id} name={project.name} />
+      <SourceSection
+        projectId={project.id}
+        source={project.source}
+        repoUrl={project.repoUrl}
+      />
+      <DangerZone project={{ id: project.id, name: project.name }} />
+    </ProjectSettingsLayout>
+  );
 }

@@ -16,6 +16,12 @@ export type CheckState = {
   retryAt: Date | null;
 };
 
+/** Where a report's input comes from. */
+export type ReportOrigin = {
+  source: "paste" | "upload" | "github";
+  repoUrl: string | null;
+};
+
 /** The report input a check runs over. */
 export type CheckInput = {
   dependencies: ManifestDependency[];
@@ -60,11 +66,13 @@ export type CheckStore = {
   finish(checkId: string, snapshot: CheckSnapshot): Promise<boolean>;
   /**
    * With `input`, replaces the report input in the same transaction as the
-   * new check: a check that can't start leaves the input as it was.
+   * new check: a check that can't start leaves the input as it was. `origin`
+   * ("Replace source") replaces where the input comes from along with it.
    */
   createCheck(
     reportId: string,
     input?: ReportInput,
+    origin?: ReportOrigin,
   ): Promise<Result<{ checkId: string }, CreateCheckError>>;
   /** Back to running, after deleting rows with `dropReasons`. */
   reopenCheck(
