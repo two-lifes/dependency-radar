@@ -2,7 +2,7 @@
 
 Цвета на вайрфреймах не финальные, цвета — только из style-guide.
 
-Версия 2.1 · 19.10.2026 · дополняет `docs/spec.md` v1.2.
+Версия 2.2 · 22.10.2026 · дополняет `docs/spec.md` v1.3.
 
 Этот документ — единственный источник правды о том, **какие экраны есть, по каким адресам они открываются, что на них расположено, куда ведёт каждое действие и как экран выглядит в каждом состоянии**. Визуально то же самое показано в `sitemap.excalidraw` (навигация) и `wireframes.excalidraw` (раскладка экранов). Если картинка и этот текст расходятся, прав текст.
 
@@ -35,6 +35,7 @@
 | `/r/[reportId]/save` | Без интерфейса: сохраняет гостевой отчёт как проект и переходит в проект | вошедшие (гостя отправляет на `/login?next=…`) | MVP |
 | `/projects` | Дашборд проектов | вошедшие | MVP (простой), 1.1 (полный) |
 | `/projects/new` | Создание проекта | вошедшие | MVP |
+| `/projects/import` | Импорт публичных репозиториев из GitHub | вошедшие (в демо недоступен: 404) | MVP |
 | `/projects/[id]` | Редирект на `/projects/[id]/dependencies` | участники проекта | MVP |
 | `/projects/[id]/dependencies` | Отчёт, вкладка «Dependencies» | участники | MVP |
 | `/projects/[id]/vulnerabilities` | Отчёт, вкладка «Vulnerabilities» | участники | MVP |
@@ -69,6 +70,7 @@ flowchart LR
   Save(["/r/:id/save"]):::sys
   Projects["/projects Дашборд"]:::mvp
   NewProject["/projects/new"]:::mvp
+  Import["/projects/import"]:::mvp
   Report["/projects/:id/dependencies | vulnerabilities"]:::mvp
   Plan["/projects/:id/plan"]:::v11
   History["/projects/:id/history"]:::v11
@@ -94,6 +96,9 @@ flowchart LR
   Projects -- "карточка" --> Report
   Projects -- "New project" --> NewProject
   NewProject -- "Create & check" --> Report
+  Projects -- "Import from GitHub" --> Import
+  Import -- "Import & check" --> Projects
+  Import -- "Connect GitHub" --> Profile
   Report -- "клик по строке" --> Drawer
   Report -- "вкладка" --> Plan
   Report -- "вкладка" --> History
@@ -225,7 +230,7 @@ flowchart LR
 | «Save project», гость не вошёл | `/login?next=/r/[id]/save` |
 | «Save project», вошёл | `/r/[id]/save` → создаётся проект из отчёта → `/projects/[newId]/dependencies`, тост «Project saved» |
 | «Copy link» | копирует текущий URL с фильтрами, тост «Link copied» |
-| «Check again» | новая проверка на этой же странице; пока идёт проверка, кнопка неактивна |
+| «Check again» | новая проверка на этой же странице; пока идёт проверка, кнопка неактивна. Если источник — GitHub, сначала заново читаются `package.json` и lock-файл (кнопка неактивна, спиннер и «Fetching repository…»); пакеты, удалённые из `package.json`, исчезают из таблицы, новые появляются скелетон-строками. Если репозиторий прочитать не удалось, проверка не начинается, данные остаются, тост-ошибка с текстом из 5.1 («Repository not found or private.», «No package.json in the repository root.», «GitHub is rate-limiting us. Try again in N minutes.» и т. д.). «Resume» и «Retry failed» репозиторий не перечитывают |
 | «Cancel» | останавливает проверку → состояние «Check cancelled» |
 | Плитка сводки | фильтр в таблице, переход на вкладку Dependencies |
 
@@ -319,7 +324,7 @@ N — выделенные пакеты, которые попадут в ком
 ### 5.10. Дашборд `/projects` [MVP — простой, 1.1 — полный]
 
 **Раскладка:**
-1. Заголовок «Projects», справа кнопка «New project».
+1. Заголовок «Projects», справа «Import from GitHub» (вторичная, только если GitHub подключён и это не демо) и «New project» (основная).
 2. [1.2] Переключатель «Mine | Team».
 3. [1.1] Поиск и сортировка «Sort: Health / Name / Last checked».
 4. Сетка карточек (3 в ряд на desktop, 2 на планшете, 1 на мобильных). Вся карточка — ссылка на `/projects/[id]/dependencies`:
@@ -327,11 +332,14 @@ N — выделенные пакеты, которые попадут в ком
    - оценка здоровья (число и цвет), «7 vulnerabilities» (красным, если есть critical/high), «Checked 2 h ago»;
    - [1.1] мини-график здоровья за 30 дней;
    - меню «⋯»: «Check now», «Settings», «Delete»;
-   - если идёт проверка, вместо даты «Checking… 40%».
+   - если идёт проверка, вместо даты «Checking… 40%»;
+   - проект ещё ни разу не проверен до конца (например, только что импортирован): «Queued», пока ждёт очереди; если очередь упёрлась в лимит — «Too many checks. Try again in N minutes.» вместо даты.
+
+**Очередь проверок.** Пока дашборд открыт, он сам запускает проверки проектов без завершённой проверки (импортированных, а также тех, чья первая проверка оборвалась), не больше 2 одновременно, в порядке добавления. «Check now» в меню «⋯» ставит проект в ту же очередь первым. Ушёл с дашборда — идущие проверки останавливаются, как при закрытии отчёта; при следующем открытии очередь продолжает. Открытый проект без проверок сразу начинает первую проверку на странице отчёта.
 5. [1.1] Блок «Across projects»: пакеты, устаревшие в двух и более проектах, например «typescript — behind in 3 projects».
 
 **Состояния:**
-- пусто (первый вход): иконка, «No projects yet», «Add a project to track its dependencies over time.», кнопка «New project»;
+- пусто (первый вход): иконка, «No projects yet», «Add a project to track its dependencies over time.», кнопки «Import from GitHub» (основная, если GitHub подключён) и «New project»; если GitHub не подключён — «New project» и ссылка «Connect GitHub to import your repositories» → `/settings/profile`; в демо — только «New project»;
 - загрузка: 6 скелетон-карточек;
 - ошибка: «Couldn't load projects. Retry».
 
@@ -344,6 +352,31 @@ N — выделенные пакеты, которые попадут в ком
 4. Кнопки: «Create & check» (основная) → `/projects/[id]/dependencies` с уже запущенной проверкой; «Cancel» → `/projects`.
 
 Ошибки — как на лендинге. Если пользователь уходит с заполненной формы, спросить «Discard changes?».
+
+### 5.11.1. Импорт из GitHub `/projects/import` [MVP]
+
+Отдельная страница, ширина до 720px. Ссылка «← Back to projects», заголовок «Import from GitHub», подзаголовок «Public repositories of @login. Each one becomes a project.»
+1. Поиск «Search repositories…» (по имени, без запроса к серверу).
+2. Список публичных репозиториев пользователя (только свои, без форков и архивных; 100 последних по дате push): чекбокс, `owner/repo`, описание в одну строку, язык, «Updated 3 days ago». Уже добавленный репозиторий: чекбокс неактивен, метка «Added», имя — ссылка на проект.
+3. Нижняя панель (прилипает): «N selected» и «Import & check (N)» (основная, неактивна при N = 0); «Cancel» → `/projects`. За раз — до 10 репозиториев; остальные чекбоксы после 10-го неактивны с подсказкой «Up to 10 repositories at a time.»
+
+**Действия:**
+| Действие | Результат |
+|---|---|
+| «Import & check», все прочитаны | создаются проекты (имя — `name` из `package.json`, иначе имя репозитория), источник — репозиторий → `/projects`, тост «Added 4 projects. Checking now…», проверки идут очередью дашборда (5.10) |
+| «Import & check», часть не прочитана | остаёмся на странице: добавленные строки получают «Added», у непрочитанных под строкой ошибка из 5.1, плашка «Added 3 projects. 1 repository couldn't be imported.» с кнопкой «Go to projects» |
+| «Import & check», ничего не прочитано | остаёмся на странице, ошибки под строками |
+
+Во время импорта кнопка неактивна, спиннер и «Importing…». Импорт сам проверку не запускает и в лимит проверок не входит; лимит считается, когда очередь дашборда стартует проверку.
+
+**Состояния:**
+- загрузка: 8 скелетон-строк;
+- ошибка: «Couldn't load your repositories. Retry»; лимит GitHub — «GitHub is rate-limiting us. Try again in N minutes.»;
+- нет репозиториев: «No public repositories on @login.» и кнопка «New project»;
+- поиск без совпадений: «No repositories match "q".»;
+- GitHub не подключён (открыли адрес напрямую): «Connect GitHub to import your repositories.» и кнопка «Connect GitHub» → `/settings/profile`.
+
+**Мобильная версия:** список во всю ширину, описание скрыто, нижняя панель на всю ширину.
 
 ### 5.12. Настройки проекта `/projects/[id]/settings` [MVP]
 
