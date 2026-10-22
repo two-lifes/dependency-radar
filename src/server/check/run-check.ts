@@ -27,6 +27,7 @@ import type { CheckSnapshot, CheckStore } from "./check-store";
 import type { CheckEvent, EmitEvent } from "./events";
 import {
   buildPackageRow,
+  type CheckPackageRow,
   rowToFindings,
   toPackageRowJson,
 } from "./package-row";
@@ -237,9 +238,24 @@ export async function runCheck(
 export async function finishCheck(
   store: CheckStore,
   checkId: string,
-  options: { now: Date; cancelled?: boolean; retryAfterSeconds?: number },
+  options: SnapshotOptions,
 ): Promise<DoneEvent> {
-  const rows = await store.listRows(checkId);
+  const snapshot = checkSnapshot(await store.listRows(checkId), options);
+  if (await store.finish(checkId, snapshot)) return doneEvent(snapshot);
+  return currentDoneEvent(store, checkId);
+}
+
+type SnapshotOptions = {
+  now: Date;
+  cancelled?: boolean;
+  retryAfterSeconds?: number;
+};
+
+/** How a check with these rows ends; the demo seed stores the same snapshot. */
+export function checkSnapshot(
+  rows: readonly CheckPackageRow[],
+  options: SnapshotOptions,
+): CheckSnapshot {
   const findings = rows.map(rowToFindings);
   const outcome = options.cancelled
     ? { status: "cancelled" as const, failure: null }
@@ -253,7 +269,7 @@ export async function finishCheck(
       : null;
 
   const counts = reportCounts(findings);
-  const snapshot: CheckSnapshot = {
+  return {
     status: outcome.status,
     failureReason: outcome.failure,
     retryAt,
@@ -263,8 +279,6 @@ export async function finishCheck(
       counts.vulnerableBySeverity.critical + counts.vulnerableBySeverity.high,
     finishedAt: options.now,
   };
-  if (await store.finish(checkId, snapshot)) return doneEvent(snapshot);
-  return currentDoneEvent(store, checkId);
 }
 
 /** The `done` event for a check that is no longer running. */
