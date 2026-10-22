@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { GuestHeader } from "@/components/guest-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
@@ -77,7 +76,7 @@ export default async function HomePage() {
           <div className="grid justify-items-center gap-6 rounded-xl border border-border p-6 sm:p-10">
             <RadarIllustration className="max-w-140" />
             <Button asChild variant="secondary">
-              <Link href="/demo">{copy.example.openDemo}</Link>
+              <a href="/demo">{copy.example.openDemo}</a>
             </Button>
           </div>
         </section>

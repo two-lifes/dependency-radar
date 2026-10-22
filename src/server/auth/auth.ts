@@ -4,6 +4,8 @@ import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
+import { isDemoUser } from "../demo/demo-user";
+import { demoSignIn } from "./demo-sign-in";
 import { sendMagicLinkEmail } from "./magic-link-email";
 
 /** screens 5.3: "It expires in 15 minutes." */
@@ -38,11 +40,21 @@ function createAuth() {
     account: { accountLinking: { allowDifferentEmails: true } },
     // "Delete account" requires a session younger than a day (freshAge).
     user: { deleteUser: { enabled: true } },
+    databaseHooks: {
+      account: {
+        create: {
+          // A GitHub account linked to the shared demo user would follow
+          // every visitor (plan.md 25). `false` makes linking fail.
+          before: async (row) => (isDemoUser(row.userId) ? false : undefined),
+        },
+      },
+    },
     plugins: [
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,
         sendMagicLink: ({ email, url }) => sendMagicLinkEmail({ email, url }),
       }),
+      demoSignIn(),
       // Sets cookies from Server Actions; Better Auth requires it last.
       nextCookies(),
     ],

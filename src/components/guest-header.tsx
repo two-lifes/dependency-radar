@@ -35,8 +35,9 @@ export function GuestHeader({ signedIn = false }: { signedIn?: boolean }) {
           </nav>
         ) : (
           <nav className="flex items-center gap-2">
+            {/* A full navigation: `/demo` is a route handler that sets the session cookie. */}
             <Button asChild variant="secondary" className="max-sm:hidden">
-              <Link href="/demo">{copy.tryDemo}</Link>
+              <a href="/demo">{copy.tryDemo}</a>
             </Button>
             <Button asChild>
               <Link href="/login">{copy.signIn}</Link>
@@ -55,7 +56,7 @@ export function GuestHeader({ signedIn = false }: { signedIn?: boolean }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem asChild>
-                  <Link href="/demo">{copy.tryDemo}</Link>
+                  <a href="/demo">{copy.tryDemo}</a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
