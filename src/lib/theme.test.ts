@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { THEME_STORAGE_KEY, themeScript } from "./theme";
+import {
+  readThemePreference,
+  setThemePreference,
+  THEME_STORAGE_KEY,
+  themeScript,
+} from "./theme";
 
 type MediaListener = () => void;
 
@@ -95,5 +100,42 @@ describe("themeScript", () => {
     runThemeScript();
     system.change(true);
     expect(root()).not.toHaveClass("dark");
+  });
+});
+
+describe("setThemePreference", () => {
+  it("applies and remembers an explicit theme", () => {
+    mockSystemTheme(false);
+    setThemePreference("dark");
+    expect(root()).toHaveClass("dark");
+    expect(root().style.colorScheme).toBe("dark");
+    expect(readThemePreference()).toBe("dark");
+  });
+
+  it("system clears the stored value and follows the OS", () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+    mockSystemTheme(true);
+    setThemePreference("system");
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+    expect(root()).toHaveClass("dark");
+    expect(readThemePreference()).toBe("system");
+  });
+
+  it("still applies the theme when storage throws", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    mockSystemTheme(true);
+    expect(() => setThemePreference("light")).not.toThrow();
+    expect(root()).not.toHaveClass("dark");
+  });
+
+  it("keeps following the OS after switching back to system", () => {
+    const system = mockSystemTheme(false);
+    runThemeScript();
+    setThemePreference("dark");
+    setThemePreference("system");
+    system.change(true);
+    expect(root()).toHaveClass("dark");
   });
 });
