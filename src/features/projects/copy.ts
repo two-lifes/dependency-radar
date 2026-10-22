@@ -8,6 +8,8 @@ export const PROJECT_NAME_MAX = 60;
 export const projectsCopy = {
   title: "Projects",
   newProject: "New project",
+  importFromGithub: "Import from GitHub",
+  connectGithub: "Connect GitHub to see your repositories",
   empty: {
     title: "No projects yet",
     text: "Add a project to track its dependencies over time.",
@@ -53,6 +55,20 @@ export const newProjectCopy = {
   errors: {
     nameRequired: "Enter a project name.",
     nameTooLong: `Use ${PROJECT_NAME_MAX} characters or fewer.`,
+  },
+  // screens 5.11.1
+  repos: {
+    title: (login: string) => `Your public repositories (@${login})`,
+    titleLoading: "Your public repositories",
+    search: "Search repositories…",
+    loading: "Loading your repositories",
+    failed: "Couldn't load your repositories.",
+    retry: "Retry",
+    empty: (login: string) => `No public repositories on @${login}.`,
+    noMatches: (query: string) => `No repositories match "${query}".`,
+    added: "Added",
+    updated: (ago: string) => `Updated ${ago}`,
+    connect: "Connect GitHub to see your repositories",
   },
   submit: "Create & check",
   pending: "Creating…",

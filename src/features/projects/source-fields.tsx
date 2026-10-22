@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentProps, type Ref, useId } from "react";
+import { type ComponentProps, type ReactNode, type Ref, useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,8 @@ export type SourceValues = {
 /**
  * The three sources of the landing as a form section: `/projects/new` and
  * "Replace source" in project settings (screens 5.11, 5.12). The parent owns
- * the form state; this only lays the fields out.
+ * the form state; this only lays the fields out. `githubExtra` goes under the
+ * URL field: the repository list, only on `/projects/new` (decisions 48).
  */
 export function SourceFields({
   legend,
@@ -34,6 +35,7 @@ export function SourceFields({
   browseRef,
   error,
   pending,
+  githubExtra,
 }: {
   legend: string;
   source: CheckSource;
@@ -46,6 +48,7 @@ export function SourceFields({
   browseRef: Ref<HTMLButtonElement>;
   error?: string;
   pending: boolean;
+  githubExtra?: ReactNode;
 }) {
   const errorId = useId();
   const fieldProps = {
@@ -103,6 +106,7 @@ export function SourceFields({
             {...urlProps}
           />
           <p className="text-sm text-muted-foreground">{copy.githubHint}</p>
+          {githubExtra}
         </TabsContent>
       </Tabs>
       {error ? (

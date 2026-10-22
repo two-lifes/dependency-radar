@@ -4,8 +4,10 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ReportInput } from "@/server/analysis/report-input";
+import type { Result } from "@/server/analysis/result";
 import { requireSession } from "@/server/auth/session";
 import { resumeCheck, startCheck } from "@/server/check/check-control";
+import { getGithubAccountId } from "@/server/db/accounts";
 import { createPgCheckStore } from "@/server/db/check-store";
 import { getDb } from "@/server/db/client";
 import {
@@ -13,14 +15,22 @@ import {
   deleteProject,
   getProjectCheckState,
   getProjectSettings,
+  listProjectRepos,
   renameProject as renameProjectInDb,
 } from "@/server/db/projects";
 import { consumeCheck } from "@/server/rate-limit";
+import { createPgCache } from "@/server/sources/cache";
+import {
+  fetchGithubLogin,
+  fetchGithubUserRepos,
+} from "@/server/sources/github";
+import type { SourceError } from "@/server/sources/http";
 import { tooManyChecks } from "../check/copy";
 import { prepareReport } from "../check/prepare-input";
 import { readRepoInput } from "../check/read-repo";
 import { landingCopy } from "../landing/copy";
 import { newProjectCopy, PROJECT_NAME_MAX } from "./copy";
+import { type GithubRepoList, markAdded } from "./github-repos";
 import type { NewProjectState } from "./new-project-state";
 import { projectSettingsCopy } from "../project-settings/copy";
 import type { ReplaceSourceState } from "../project-settings/replace-source-state";
@@ -117,6 +127,33 @@ export async function createProject(
   }
   // Outside try: redirect() throws to hand control back to Next.js.
   redirect(`/projects/${projectId}/dependencies`);
+}
+
+/**
+ * screens 5.11.1: the user's public repositories for the "GitHub URL" tab,
+ * loaded after the page so a slow or failing GitHub never holds the form up.
+ */
+export async function loadGithubRepos(): Promise<
+  Result<GithubRepoList, SourceError>
+> {
+  const { user } = await requireSession();
+  const db = getDb();
+  const accountId = await getGithubAccountId(db, user.id);
+  // Disconnected in another tab since the page was rendered.
+  if (!accountId) return { ok: false, error: { code: "unavailable" } };
+
+  const client = { cache: createPgCache(db), token: process.env.GITHUB_TOKEN };
+  const login = await fetchGithubLogin(accountId, client);
+  if (!login.ok) return login;
+  const [repos, projects] = await Promise.all([
+    fetchGithubUserRepos(login.value, client),
+    listProjectRepos(db, user.id),
+  ]);
+  if (!repos.ok) return repos;
+  return {
+    ok: true,
+    value: { login: login.value, repos: markAdded(repos.value, projects) },
+  };
 }
 
 function repoName(repoUrl: string | undefined): string {

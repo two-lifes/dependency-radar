@@ -188,6 +188,19 @@ export async function deleteProject(
   return deleted.length > 0;
 }
 
+/** The repositories of the user's projects, to mark them "Added" (screens 5.11.1). */
+export function listProjectRepos(
+  db: Db,
+  userId: string,
+): Promise<{ projectId: string; repoUrl: string | null }[]> {
+  return db
+    .select({ projectId: projects.id, repoUrl: reports.repoUrl })
+    .from(projects)
+    .innerJoin(reports, eq(reports.projectId, projects.id))
+    .where(eq(projects.ownerId, userId))
+    .orderBy(asc(projects.createdAt), asc(projects.id));
+}
+
 /** screens 5.10: the user's projects in the order they were added. */
 export async function listProjects(
   db: Db,

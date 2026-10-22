@@ -27,8 +27,11 @@ import {
   addUploadedFiles,
   type UploadSelection,
 } from "../landing/upload-files";
+import type { CheckSource } from "../landing/check-form-state";
 import { createProject } from "./actions";
 import { newProjectCopy as copy, PROJECT_NAME_MAX } from "./copy";
+import { GithubRepoList, useGithubRepos } from "./github-repo-list";
+import type { RepoRow } from "./github-repos";
 import { initialNewProjectState } from "./new-project-state";
 import { packageNameFrom } from "./package-name";
 import { appendSource, missingManifest, SourceFields } from "./source-fields";
@@ -50,8 +53,17 @@ const formSchema = z
 
 type FormValues = z.input<typeof formSchema>;
 
-/** screens 5.11: name and source, then "Create & check". */
-export function NewProjectForm() {
+/**
+ * screens 5.11: name and source, then "Create & check". With GitHub connected
+ * the "GitHub URL" tab lists the user's repositories (screens 5.11.1).
+ */
+export function NewProjectForm({
+  initialSource = "paste",
+  githubConnected = false,
+}: {
+  initialSource?: CheckSource;
+  githubConnected?: boolean;
+}) {
   const [state, formAction, pending] = useActionState(
     createProject,
     initialNewProjectState,
@@ -64,7 +76,12 @@ export function NewProjectForm() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { source: "paste", name: "", packageJson: "", url: "" },
+    defaultValues: {
+      source: initialSource,
+      name: "",
+      packageJson: "",
+      url: "",
+    },
   });
   const [upload, setUpload] = useState<UploadSelection>({});
   // Errors found in the browser (dropped files) before anything is sent.
@@ -74,6 +91,8 @@ export function NewProjectForm() {
   const [dismissedAttempt, setDismissedAttempt] = useState(0);
   // Once the name is typed by hand, package.json no longer replaces it.
   const [nameEdited, setNameEdited] = useState(false);
+  // The picked row; typing in the URL field clears it.
+  const [selectedRepoUrl, setSelectedRepoUrl] = useState<string>();
   // Own refs rather than RHF's setFocus, which focused nothing after a
   // server answer here.
   const nameRef = useRef<HTMLInputElement>(null);
@@ -94,6 +113,7 @@ export function NewProjectForm() {
     url.trim() !== "" ||
     Boolean(upload.manifest || upload.lockfile);
   const guard = useDiscardGuard(dirty && !pending);
+  const repos = useGithubRepos(githubConnected && source === "github");
 
   const serverError =
     !pending && state.attempt !== dismissedAttempt ? state.error : undefined;
@@ -144,6 +164,17 @@ export function NewProjectForm() {
     }
   };
 
+  const onSelectRepo = (repo: RepoRow) => {
+    setSelectedRepoUrl(repo.url);
+    setValue("url", repo.url);
+    if (!nameEdited) {
+      setValue("name", repo.name.slice(0, PROJECT_NAME_MAX), {
+        shouldValidate: Boolean(errors.name),
+      });
+    }
+    clearErrors();
+  };
+
   const onValid = (form: FormValues) => {
     const noManifest =
       form.source === "upload" ? missingManifest(upload) : undefined;
@@ -171,7 +202,10 @@ export function NewProjectForm() {
     },
   });
   const { ref: urlFieldRef, ...urlField } = register("url", {
-    onChange: clearErrors,
+    onChange: () => {
+      setSelectedRepoUrl(undefined);
+      clearErrors();
+    },
   });
 
   return (
@@ -240,6 +274,15 @@ export function NewProjectForm() {
           browseRef={browseRef}
           error={sourceError}
           pending={pending}
+          githubExtra={
+            <GithubRepoList
+              connected={githubConnected}
+              state={repos}
+              selectedUrl={selectedRepoUrl}
+              onSelect={onSelectRepo}
+              disabled={pending}
+            />
+          }
         />
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
