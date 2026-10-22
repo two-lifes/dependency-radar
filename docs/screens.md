@@ -384,6 +384,8 @@ N — выделенные пакеты, которые попадут в ком
 4. [1.1] «Ignored packages»: список с причинами и «Remove».
 5. «Danger zone» (красная рамка): «Delete project» → диалог подтверждения с вводом имени проекта (тот же, что в меню карточки) → `/projects`, тост «Project deleted».
 
+**Демо:** у общих проектов демо имя, «Replace source» и «Delete project» неактивны с подсказкой «Not available in the demo.». Проект, созданный в демо, виден только создавшей его сессии, и его настройки работают как обычно; для других сессий он — 404.
+
 **Состояния:** загрузка — скелетон трёх секций; ошибка — «Couldn't load project settings. Retry»; чужой проект — 404.
 
 ### 5.13. Настройки аккаунта `/settings/*`
@@ -391,7 +393,7 @@ N — выделенные пакеты, которые попадут в ком
 Слева вертикальное меню разделов (на мобильных — вкладки сверху): «Profile» [MVP], «Notifications» [1.2], «Team» [1.2].
 
 - **Profile [MVP]:** секции карточками:
-  - «Account»: «Name» (до 60 символов, может быть пустым — тогда в шапке email) с «Save», тост «Name saved»; «Email» только для чтения;
+  - «Account»: «Name» (до 60 символов, может быть пустым — тогда в шапке email) с «Save», тост «Name saved»; «Email» только для чтения. В демо «Name» и «Save» неактивны с подсказкой «Not available in the demo.»;
   - «GitHub»: «Connected as @user» (логин не прочитался — «Connected to GitHub») или подсказка «Connect GitHub to import your repositories.» и кнопка «Connect GitHub» (возврат на эту же страницу). Сбой или аккаунт GitHub уже привязан к другому пользователю — «Couldn't connect GitHub. It may already be connected to another account.»;
   - «Theme»: Light / Dark / System, применяется сразу, без «Save»;
   - «Danger zone»: «Delete account» → диалог «Delete account?» с вводом email (регистр не важен) → лендинг, тост «Account deleted». Если вход был больше суток назад — «For security, sign in again to delete your account.» и кнопка «Sign in again» (выход и `/login?next=/settings/profile`).
