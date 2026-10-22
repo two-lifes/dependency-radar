@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getAuth } from "@/server/auth/auth";
 import { requireSession } from "@/server/auth/session";
+import { isDemoUser } from "@/server/demo/demo-user";
 import { ACCOUNT_DELETED_PARAM } from "./account-deleted";
 import { PROFILE_NAME_MAX, profileCopy } from "./copy";
 
@@ -49,6 +50,8 @@ export async function deleteAccount(
   email: string,
 ): Promise<DeleteAccountResult> {
   const { user } = await requireSession();
+  // The UI disables it; this stops a direct call (plan.md 25).
+  if (isDemoUser(user.id)) return { error: "failed" };
   if (email.trim().toLowerCase() !== user.email.toLowerCase()) {
     return { error: "mismatch" };
   }

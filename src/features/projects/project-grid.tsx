@@ -12,7 +12,13 @@ import { ProjectCard } from "./project-card";
 import { useCheckQueue } from "./use-check-queue";
 
 /** screens 5.10: the cards and the dashboard's check queue. */
-export function ProjectGrid({ projects }: { projects: DashboardProject[] }) {
+export function ProjectGrid({
+  projects,
+  demo = false,
+}: {
+  projects: DashboardProject[];
+  demo?: boolean;
+}) {
   const { queue, checkNow, forget } = useCheckQueue(
     projects.filter(needsFirstCheck).map((project) => project.id),
   );
@@ -32,6 +38,7 @@ export function ProjectGrid({ projects }: { projects: DashboardProject[] }) {
               )}
               onCheckNow={() => checkNow(project.id)}
               onDelete={() => setDeleting(project)}
+              demo={demo}
             />
           </li>
         ))}

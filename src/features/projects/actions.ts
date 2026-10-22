@@ -18,6 +18,7 @@ import {
   listProjectRepos,
   renameProject as renameProjectInDb,
 } from "@/server/db/projects";
+import { isDemoUser } from "@/server/demo/demo-user";
 import { consumeCheck } from "@/server/rate-limit";
 import { createPgCache } from "@/server/sources/cache";
 import {
@@ -222,6 +223,8 @@ export async function removeProject(
 ): Promise<{ ok: boolean }> {
   if (!idSchema.safeParse(projectId).success) return { ok: false };
   const { user } = await requireSession();
+  // The UI disables it; this stops a direct call (plan.md 25).
+  if (isDemoUser(user.id)) return { ok: false };
   const ok = await deleteProject(getDb(), projectId, user.id);
   refresh();
   return { ok };

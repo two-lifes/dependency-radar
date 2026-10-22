@@ -17,22 +17,37 @@ import {
 import { Input } from "@/components/ui/input";
 import { loginPath } from "@/lib/safe-next";
 import { authClient } from "../auth/auth-client";
+import { DemoHint } from "../demo/demo-hint";
 import { deleteAccount } from "./actions";
 import { profileCopy } from "./copy";
 
 const copy = profileCopy.danger;
 
 /** screens 5.13 "Danger zone": the email has to be typed in. */
-export function DeleteAccountSection({ email }: { email: string }) {
+export function DeleteAccountSection({
+  email,
+  demo = false,
+}: {
+  email: string;
+  /** The shared demo account can't be deleted (plan.md 25). */
+  demo?: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const hintId = useId();
 
   return (
     <SettingsSection title={copy.title} description={copy.text} danger>
-      <div>
-        <Button variant="destructive" onClick={() => setOpen(true)}>
+      <div className="grid justify-items-start gap-2">
+        <Button
+          variant="destructive"
+          disabled={demo}
+          aria-describedby={demo ? hintId : undefined}
+          onClick={() => setOpen(true)}
+        >
           <Trash2 aria-hidden />
           {copy.delete}
         </Button>
+        {demo ? <DemoHint id={hintId} /> : null}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         {open ? (

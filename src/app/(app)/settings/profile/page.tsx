@@ -6,6 +6,7 @@ import { GithubSection } from "@/features/profile/github-section";
 import { getGithubConnection } from "@/features/profile/github-connection";
 import { ThemeSection } from "@/features/profile/theme-section";
 import { requireSession } from "@/server/auth/session";
+import { isDemoUser } from "@/server/demo/demo-user";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -20,6 +21,7 @@ export default async function ProfilePage({
     searchParams,
   ]);
   const connection = await getGithubConnection(user.id);
+  const demo = isDemoUser(user.id);
 
   return (
     <main className="grid min-w-0 gap-6">
@@ -30,9 +32,10 @@ export default async function ProfilePage({
       <GithubSection
         connection={connection}
         linkFailed={params.reason === GITHUB_LINK_REASON}
+        demo={demo}
       />
       <ThemeSection />
-      <DeleteAccountSection email={user.email} />
+      <DeleteAccountSection email={user.email} demo={demo} />
     </main>
   );
 }

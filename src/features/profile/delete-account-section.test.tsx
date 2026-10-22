@@ -79,4 +79,11 @@ describe("DeleteAccountSection", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
+
+  it("disables deleting the demo account and says why", () => {
+    render(<DeleteAccountSection email={EMAIL} demo />);
+    const button = screen.getByRole("button", { name: "Delete account" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("Not available in the demo.");
+  });
 });

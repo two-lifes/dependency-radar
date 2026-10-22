@@ -116,4 +116,26 @@ describe("ProjectCard", () => {
       "data-disabled",
     );
   });
+
+  it("disables Delete in the demo and says why", async () => {
+    const onDelete = vi.fn();
+    render(
+      <TooltipProvider>
+        <ProjectCard
+          project={project}
+          status={{ kind: "checked", at: new Date() }}
+          onCheckNow={vi.fn()}
+          onDelete={onDelete}
+          demo
+        />
+      </TooltipProvider>,
+    );
+    await openMenu();
+
+    const item = screen.getByRole("menuitem", { name: /Delete/ });
+    expect(item).toHaveAttribute("data-disabled");
+    expect(item).toHaveTextContent("Not available in the demo.");
+    fireEvent.click(item);
+    expect(onDelete).not.toHaveBeenCalled();
+  });
 });

@@ -21,6 +21,7 @@ import { cn } from "@/lib/cn";
 import type { DashboardProject } from "@/server/analysis/dashboard-card";
 import { type ScoreBand, scoreBand } from "@/server/analysis/health-score";
 import { tooManyChecks } from "../check/copy";
+import { demoCopy } from "../demo/copy";
 import { RelativeTime } from "../report/relative-time";
 import type { DisplayStatus } from "./check-queue";
 import { projectsCopy } from "./copy";
@@ -44,11 +45,14 @@ export function ProjectCard({
   status,
   onCheckNow,
   onDelete,
+  demo = false,
 }: {
   project: DashboardProject;
   status: DisplayStatus;
   onCheckNow: () => void;
   onDelete: () => void;
+  /** The shared demo account can't delete projects (plan.md 25). */
+  demo?: boolean;
 }) {
   const { result } = project;
   const score = result?.score ?? null;
@@ -103,9 +107,22 @@ export function ProjectCard({
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={demo}
+              onSelect={onDelete}
+            >
               <Trash2 aria-hidden />
-              {copy.delete}
+              {demo ? (
+                <span className="grid">
+                  {copy.delete}
+                  <span className="text-xs text-muted-foreground">
+                    {demoCopy.unavailable}
+                  </span>
+                </span>
+              ) : (
+                copy.delete
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

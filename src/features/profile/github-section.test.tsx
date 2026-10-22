@@ -56,4 +56,11 @@ describe("GithubSection", () => {
       "It may already be connected to another account.",
     );
   });
+
+  it("disables Connect GitHub in the demo and says why", () => {
+    render(<GithubSection connection={{ connected: false }} demo />);
+    const button = screen.getByRole("button", { name: "Connect GitHub" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription("Not available in the demo.");
+  });
 });

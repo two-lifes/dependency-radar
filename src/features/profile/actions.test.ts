@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { APIError } from "better-auth/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEMO_USER } from "@/server/demo/demo-user";
 import { deleteAccount, updateName } from "./actions";
 
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
@@ -10,10 +11,11 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+const signedIn = vi.hoisted(() => ({
+  user: { id: "u1", email: "Ada@example.com" },
+}));
 vi.mock("@/server/auth/session", () => ({
-  requireSession: async () => ({
-    user: { id: "u1", email: "Ada@example.com" },
-  }),
+  requireSession: async () => signedIn,
 }));
 const api = vi.hoisted(() => ({
   updateUser: vi.fn(async () => ({ status: true })),
@@ -54,6 +56,19 @@ describe("updateName", () => {
 });
 
 describe("deleteAccount", () => {
+  it("never deletes the demo account", async () => {
+    const real = signedIn.user;
+    signedIn.user = { id: DEMO_USER.id, email: DEMO_USER.email };
+    try {
+      expect(await deleteAccount(DEMO_USER.email)).toEqual({
+        error: "failed",
+      });
+      expect(api.deleteUser).not.toHaveBeenCalled();
+    } finally {
+      signedIn.user = real;
+    }
+  });
+
   it("deletes nothing when the email doesn't match", async () => {
     expect(await deleteAccount("eve@example.com")).toEqual({
       error: "mismatch",

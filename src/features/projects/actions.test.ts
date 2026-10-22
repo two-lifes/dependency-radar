@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEMO_USER } from "@/server/demo/demo-user";
 import { initialReplaceSourceState } from "../project-settings/replace-source-state";
 import {
   createProject,
@@ -42,8 +43,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-real-ip": "203.0.113.7" }),
 }));
+const signedIn = vi.hoisted(() => ({ userId: "u1" }));
 vi.mock("@/server/auth/session", () => ({
-  requireSession: async () => ({ user: { id: "u1" } }),
+  requireSession: async () => ({ user: { id: signedIn.userId } }),
   getOptionalSession: async () => ({ user: { id: "u1" } }),
 }));
 vi.mock("@/server/db/client", () => ({ getDb: () => ({}) }));
@@ -282,6 +284,17 @@ describe("removeProject", () => {
 
     expect(await removeProject(PROJECT_ID)).toEqual({ ok: true });
     expect(db.deleteProject).toHaveBeenCalledWith({}, PROJECT_ID, "u1");
+  });
+
+  it("deletes nothing for the demo account", async () => {
+    vi.clearAllMocks();
+    signedIn.userId = DEMO_USER.id;
+    try {
+      expect(await removeProject(PROJECT_ID)).toEqual({ ok: false });
+      expect(db.deleteProject).not.toHaveBeenCalled();
+    } finally {
+      signedIn.userId = "u1";
+    }
   });
 });
 

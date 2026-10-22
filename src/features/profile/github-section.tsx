@@ -1,10 +1,11 @@
 "use client";
 
 import { Check, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { SettingsSection } from "@/components/settings-section";
 import { Button } from "@/components/ui/button";
 import { authClient } from "../auth/auth-client";
+import { DemoHint } from "../demo/demo-hint";
 import { profileCopy } from "./copy";
 import { GITHUB_LINK_ERROR_PATH } from "./github-link";
 
@@ -19,13 +20,17 @@ export type GithubConnection =
 export function GithubSection({
   connection,
   linkFailed = false,
+  demo = false,
 }: {
   connection: GithubConnection;
   /** Back from GitHub with an error (already linked elsewhere, cancelled). */
   linkFailed?: boolean;
+  /** A GitHub account on the shared demo user would follow every visitor. */
+  demo?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const hintId = useId();
 
   const connect = async () => {
     setPending(true);
@@ -61,10 +66,11 @@ export function GithubSection({
               {copy.failed}
             </p>
           ) : null}
-          <div>
+          <div className="grid justify-items-start gap-2">
             <Button
               variant="secondary"
-              disabled={pending}
+              disabled={pending || demo}
+              aria-describedby={demo ? hintId : undefined}
               onClick={() => void connect()}
             >
               {pending ? (
@@ -76,6 +82,7 @@ export function GithubSection({
                 copy.connect
               )}
             </Button>
+            {demo ? <DemoHint id={hintId} /> : null}
           </div>
         </div>
       )}

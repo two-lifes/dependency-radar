@@ -5,6 +5,7 @@ import { requireSession } from "@/server/auth/session";
 import { getGithubAccountId } from "@/server/db/accounts";
 import { getDb } from "@/server/db/client";
 import { listProjects } from "@/server/db/projects";
+import { isDemoUser } from "@/server/demo/demo-user";
 
 /** screens 5.10: the dashboard (MVP: the simple one). */
 export default async function ProjectsPage() {
@@ -23,7 +24,7 @@ export default async function ProjectsPage() {
       {projects.length === 0 ? (
         <EmptyProjects githubConnected={githubConnected} />
       ) : (
-        <ProjectGrid projects={projects} />
+        <ProjectGrid projects={projects} demo={isDemoUser(user.id)} />
       )}
     </ProjectsLayout>
   );
