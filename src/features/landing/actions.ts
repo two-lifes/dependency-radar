@@ -2,17 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import {
-  buildReportInput,
-  type ReportInput,
-} from "@/server/analysis/report-input";
 import { getDb } from "@/server/db/client";
-import { createGuestReport, type NewGuestReport } from "@/server/db/reports";
-import { readUploadedLockfile } from "@/server/lockfile-upload";
+import { createGuestReport } from "@/server/db/reports";
 import { consumeCheck } from "@/server/rate-limit";
 import { tooManyChecks } from "../check/copy";
-import { manifestMessage, readRepoInput } from "../check/read-repo";
-import type { CheckFormState, CheckSource } from "./check-form-state";
+import { prepareReport } from "../check/prepare-input";
+import type { CheckFormState } from "./check-form-state";
 import { landingCopy } from "./copy";
 
 const formSchema = z.discriminatedUnion("source", [
@@ -25,9 +20,6 @@ const formSchema = z.discriminatedUnion("source", [
   }),
   z.object({ source: z.literal("github"), url: z.string() }),
 ]);
-
-type Outcome =
-  { ok: true; report: NewGuestReport } | { ok: false; message: string };
 
 /** Landing "Check dependencies": a guest report, then its page. */
 export async function startGuestCheck(
@@ -86,42 +78,4 @@ export async function startGuestCheck(
   }
   // Outside try: redirect() throws to hand control back to Next.js.
   redirect(`/r/${reportId}/dependencies`);
-}
-
-async function prepareReport(
-  form: z.infer<typeof formSchema>,
-): Promise<Outcome> {
-  if (form.source !== "github") {
-    if (form.packageJson.trim() === "") {
-      return {
-        ok: false,
-        message:
-          form.source === "paste"
-            ? landingCopy.errors.emptyPaste
-            : landingCopy.errors.noManifestFile,
-      };
-    }
-    const lockfile =
-      form.source === "upload" && form.lockfile
-        ? await readUploadedLockfile(form.lockfile)
-        : undefined;
-    return toOutcome(
-      buildReportInput({ packageJson: form.packageJson, lockfile }),
-      form.source,
-    );
-  }
-
-  const read = await readRepoInput(form.url);
-  if (!read.ok) return { ok: false, message: read.error };
-  const { input, repoUrl } = read.value;
-  return { ok: true, report: { source: "github", repoUrl, input } };
-}
-
-function toOutcome(
-  result: ReturnType<typeof buildReportInput>,
-  source: CheckSource,
-): Outcome {
-  if (!result.ok) return { ok: false, message: manifestMessage(result.error) };
-  const input: ReportInput = result.value;
-  return { ok: true, report: { source, input } };
 }

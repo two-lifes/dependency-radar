@@ -28,6 +28,7 @@ export type CheckSnapshot = {
   retryAt: Date | null;
   score: number | null;
   vulnerabilityCount: number | null;
+  severeVulnerableCount: number | null;
   finishedAt: Date;
 };
 

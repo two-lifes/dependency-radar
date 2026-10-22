@@ -47,7 +47,7 @@ export const authCopy = {
     signOut: "Sign out",
   },
   stub: {
-    projects: "Projects",
+    projectSettings: "Project settings",
     profile: "Profile",
     soon: "Coming soon.",
   },

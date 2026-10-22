@@ -1,0 +1,1 @@
+ALTER TABLE "checks" ADD COLUMN "severe_vulnerable_count" integer;

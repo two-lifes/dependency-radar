@@ -195,6 +195,8 @@ export const checks = pgTable(
     // the report page recomputes them from check_packages.
     score: integer(),
     vulnerabilityCount: integer("vulnerability_count"),
+    /** Packages whose worst vulnerability is critical or high (card colour). */
+    severeVulnerableCount: integer("severe_vulnerable_count"),
   },
   (t) => [
     index("checks_report_id_started_at_idx").on(t.reportId, t.startedAt.desc()),

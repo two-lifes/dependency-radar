@@ -215,6 +215,7 @@ describe("runCheck", () => {
       status: "completed",
       score: 84,
       vulnerabilityCount: 1,
+      severeVulnerableCount: 1,
       finishedAt: NOW,
     });
   });
@@ -475,6 +476,7 @@ describe("runCheck", () => {
       retryAt: null,
       score: null,
       vulnerabilityCount: null,
+      severeVulnerableCount: null,
       finishedAt: NOW,
     });
     await memory.store.insertRow(

@@ -142,6 +142,7 @@ describe("serveCheck", () => {
       retryAt: null,
       score: null,
       vulnerabilityCount: null,
+      severeVulnerableCount: null,
       finishedAt: NOW,
     });
     await done;

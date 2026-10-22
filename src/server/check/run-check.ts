@@ -252,12 +252,15 @@ export async function finishCheck(
         )
       : null;
 
+  const counts = reportCounts(findings);
   const snapshot: CheckSnapshot = {
     status: outcome.status,
     failureReason: outcome.failure,
     retryAt,
     score: healthScore(findings).score,
-    vulnerabilityCount: reportCounts(findings).vulnerabilities,
+    vulnerabilityCount: counts.vulnerabilities,
+    severeVulnerableCount:
+      counts.vulnerableBySeverity.critical + counts.vulnerableBySeverity.high,
     finishedAt: options.now,
   };
   if (await store.finish(checkId, snapshot)) return doneEvent(snapshot);
@@ -291,6 +294,7 @@ async function failCheck(
       retryAt: null,
       score: null,
       vulnerabilityCount: null,
+      severeVulnerableCount: null,
       finishedAt: now,
     };
     if (await store.finish(checkId, snapshot)) return doneEvent(snapshot);

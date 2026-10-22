@@ -161,6 +161,7 @@ export function createPgCheckStore(db: Db): CheckStore {
               finishedAt: null,
               score: null,
               vulnerabilityCount: null,
+              severeVulnerableCount: null,
               leaseUntil: null,
             })
             .where(eq(checks.id, checkId));

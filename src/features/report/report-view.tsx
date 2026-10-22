@@ -7,6 +7,7 @@ import { getReportPage } from "@/server/db/report-page";
 import { checkAgain, retry } from "./actions";
 import { CheckBanner, CheckFailed, CheckProgress } from "./check-status";
 import { checkFailureCopy } from "./copy";
+import { FirstCheckStarter } from "./first-check-starter";
 import { PackageCard } from "./package-card";
 import { ProjectSavedToast } from "./project-saved-toast";
 import { ReportProvider } from "./report-context";
@@ -59,9 +60,11 @@ export async function ReportView({
     shown && shownRows
       ? summarizeRows(shownRows, report.dependencies.length)
       : undefined;
-  // A report always gets its first check with it (createGuestReport), so no
-  // check at all means something broke; "Try again" starts one.
-  const failed = !check || check.status === "failed";
+  // A guest report always gets its first check with it (createGuestReport),
+  // so no check there means something broke; "Try again" starts one. A
+  // project may have none yet (imported) and starts it on opening.
+  const startFirst = mode.kind === "project" && !check;
+  const failed = !startFirst && (!check || check.status === "failed");
 
   const source: ReportSource =
     report.source === "github" && report.repoUrl
@@ -103,7 +106,9 @@ export async function ReportView({
           />
         ) : null}
 
-        {failed ? (
+        {startFirst ? (
+          <FirstCheckStarter reportId={report.id} />
+        ) : failed ? (
           <CheckFailed
             reason={checkFailureCopy[check?.failureReason ?? "internal-error"](
               check?.retryAt ?? null,
