@@ -9,6 +9,7 @@ import { SettingsSection } from "@/components/settings-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
+import { DemoHint } from "../demo/demo-hint";
 import { updateName } from "./actions";
 import { PROFILE_NAME_MAX, profileCopy } from "./copy";
 
@@ -25,9 +26,12 @@ type FormValues = z.input<typeof formSchema>;
 export function AccountSection({
   name,
   email,
+  demo = false,
 }: {
   name: string;
   email: string;
+  /** Every demo visitor would see the new name (plan.md 26.1). */
+  demo?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const {
@@ -45,6 +49,7 @@ export function AccountSection({
   const nameId = useId();
   const errorId = useId();
   const emailId = useId();
+  const hintId = useId();
   const unchanged = typed.trim() === name;
 
   const onValid = ({ name: next }: FormValues) => {
@@ -79,9 +84,9 @@ export function AccountSection({
             id={nameId}
             autoComplete="name"
             maxLength={PROFILE_NAME_MAX}
-            disabled={pending}
+            disabled={pending || demo}
             aria-invalid={errors.name ? true : undefined}
-            aria-describedby={errors.name ? errorId : undefined}
+            aria-describedby={errors.name ? errorId : demo ? hintId : undefined}
             {...register("name")}
           />
           {errors.name ? (
@@ -89,6 +94,7 @@ export function AccountSection({
               {errors.name.message}
             </p>
           ) : null}
+          {demo ? <DemoHint id={hintId} /> : null}
         </div>
         <div className="grid gap-2">
           <label htmlFor={emailId} className="text-base font-medium">
@@ -102,7 +108,7 @@ export function AccountSection({
           />
         </div>
         <div className="flex justify-end">
-          <Button type="submit" disabled={unchanged || pending}>
+          <Button type="submit" disabled={unchanged || pending || demo}>
             {pending ? (
               <>
                 <Loader2 className="motion-safe:animate-spin" aria-hidden />

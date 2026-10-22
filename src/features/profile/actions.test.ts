@@ -53,6 +53,19 @@ describe("updateName", () => {
       error: "Couldn't save the name. Try again.",
     });
   });
+
+  it("never renames the demo account", async () => {
+    const real = signedIn.user;
+    signedIn.user = { id: DEMO_USER.id, email: DEMO_USER.email };
+    try {
+      expect(await updateName("Mallory")).toEqual({
+        error: "Not available in the demo.",
+      });
+      expect(api.updateUser).not.toHaveBeenCalled();
+    } finally {
+      signedIn.user = real;
+    }
+  });
 });
 
 describe("deleteAccount", () => {

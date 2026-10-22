@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getAuth } from "@/server/auth/auth";
 import { requireSession } from "@/server/auth/session";
 import { isDemoUser } from "@/server/demo/demo-user";
+import { demoCopy } from "../demo/copy";
 import { ACCOUNT_DELETED_PARAM } from "./account-deleted";
 import { PROFILE_NAME_MAX, profileCopy } from "./copy";
 
@@ -23,7 +24,9 @@ const nameSchema = z
 export async function updateName(name: string): Promise<{ error?: string }> {
   const parsed = nameSchema.safeParse(name);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  await requireSession();
+  const { user } = await requireSession();
+  // The UI disables it; this stops a direct call (plan.md 26.1).
+  if (isDemoUser(user.id)) return { error: demoCopy.unavailable };
   try {
     await getAuth().api.updateUser({
       body: { name: parsed.data },

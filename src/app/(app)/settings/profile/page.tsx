@@ -28,7 +28,7 @@ export default async function ProfilePage({
       <h1 className="text-xl font-semibold tracking-tight">
         {profileCopy.title}
       </h1>
-      <AccountSection name={user.name} email={user.email} />
+      <AccountSection name={user.name} email={user.email} demo={demo} />
       <GithubSection
         connection={connection}
         linkFailed={params.reason === GITHUB_LINK_REASON}
