@@ -23,11 +23,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import type { CheckSource } from "../landing/check-form-state";
-import { landingCopy } from "../landing/copy";
-import { Dropzone } from "../landing/dropzone";
 import {
   addUploadedFiles,
   type UploadSelection,
@@ -36,9 +31,8 @@ import { createProject } from "./actions";
 import { newProjectCopy as copy, PROJECT_NAME_MAX } from "./copy";
 import { initialNewProjectState } from "./new-project-state";
 import { packageNameFrom } from "./package-name";
+import { appendSource, missingManifest, SourceFields } from "./source-fields";
 import { useDiscardGuard } from "./use-discard-guard";
-
-const sourceCopy = landingCopy.form;
 
 // The server checks the same rules (createProject); here they only save a
 // round trip. Source contents are checked on the server, as on the landing.
@@ -89,7 +83,6 @@ export function NewProjectForm() {
 
   const nameId = useId();
   const nameErrorId = useId();
-  const sourceErrorId = useId();
 
   const [source, name, packageJson, url] = useWatch({
     control,
@@ -152,31 +145,16 @@ export function NewProjectForm() {
   };
 
   const onValid = (form: FormValues) => {
-    if (form.source === "upload" && !upload.manifest) {
-      setLocalError(
-        upload.lockfile
-          ? landingCopy.errors.lockfileOnly
-          : landingCopy.errors.noManifestFile,
-      );
+    const noManifest =
+      form.source === "upload" ? missingManifest(upload) : undefined;
+    if (noManifest) {
+      setLocalError(noManifest);
       browseRef.current?.focus();
       return;
     }
     const formData = new FormData();
-    formData.set("source", form.source);
     formData.set("name", form.name);
-    if (form.source === "github") formData.set("url", form.url);
-    else if (form.source === "paste") {
-      formData.set("packageJson", form.packageJson);
-    } else {
-      formData.set("packageJson", upload.manifest?.text ?? "");
-      if (upload.lockfile) {
-        formData.set(
-          "lockfile",
-          upload.lockfile.gzipped,
-          "package-lock.json.gz",
-        );
-      }
-    }
+    appendSource(formData, form, upload);
     startTransition(() => formAction(formData));
   };
 
@@ -195,10 +173,6 @@ export function NewProjectForm() {
   const { ref: urlFieldRef, ...urlField } = register("url", {
     onChange: clearErrors,
   });
-  const sourceFieldProps = {
-    "aria-invalid": sourceError ? true : undefined,
-    "aria-describedby": sourceError ? sourceErrorId : undefined,
-  } as const;
 
   return (
     <>
@@ -236,81 +210,37 @@ export function NewProjectForm() {
           ) : null}
         </div>
 
-        <fieldset className="grid gap-2">
-          <legend className="mb-2 text-base font-medium">
-            {copy.sourceLabel}
-          </legend>
-          <Tabs
-            value={source}
-            onValueChange={(value) => {
-              setValue("source", value as CheckSource);
-              setLocalError(undefined);
-            }}
-          >
-            <TabsList>
-              <TabsTrigger value="paste">{sourceCopy.tabs.paste}</TabsTrigger>
-              <TabsTrigger value="upload">{sourceCopy.tabs.upload}</TabsTrigger>
-              <TabsTrigger value="github">{sourceCopy.tabs.github}</TabsTrigger>
-            </TabsList>
-
-            {/* Every panel holds a field, so the panel itself is no Tab stop
-                (WAI-ARIA tabs pattern); Radix makes it one by default. */}
-            <TabsContent value="paste" tabIndex={-1}>
-              <Textarea
-                aria-label={sourceCopy.pasteLabel}
-                placeholder={sourceCopy.pastePlaceholder}
-                spellCheck={false}
-                disabled={pending}
-                className="min-h-40 font-mono text-sm"
-                {...sourceFieldProps}
-                {...pasteField}
-                ref={(element) => {
-                  pasteFieldRef(element);
-                  pasteRef.current = element;
-                }}
-              />
-            </TabsContent>
-
-            <TabsContent value="upload" tabIndex={-1}>
-              <Dropzone
-                selection={upload}
-                onFiles={(files) => void onFiles(files)}
-                onRemove={(kind) => {
-                  setUpload((current) => ({ ...current, [kind]: undefined }));
-                  clearErrors();
-                }}
-                browseRef={browseRef}
-                invalid={Boolean(sourceError)}
-                describedBy={sourceError ? sourceErrorId : undefined}
-                disabled={pending}
-              />
-            </TabsContent>
-
-            <TabsContent value="github" tabIndex={-1} className="grid gap-2">
-              <Input
-                type="url"
-                inputMode="url"
-                aria-label={sourceCopy.githubLabel}
-                placeholder={sourceCopy.githubPlaceholder}
-                disabled={pending}
-                {...sourceFieldProps}
-                {...urlField}
-                ref={(element) => {
-                  urlFieldRef(element);
-                  urlRef.current = element;
-                }}
-              />
-              <p className="text-sm text-muted-foreground">
-                {sourceCopy.githubHint}
-              </p>
-            </TabsContent>
-          </Tabs>
-          {sourceError ? (
-            <p id={sourceErrorId} role="alert" className="text-sm text-danger">
-              {sourceError}
-            </p>
-          ) : null}
-        </fieldset>
+        <SourceFields
+          legend={copy.sourceLabel}
+          source={source}
+          onSourceChange={(value) => {
+            setValue("source", value);
+            setLocalError(undefined);
+          }}
+          pasteProps={{
+            ...pasteField,
+            ref: (element: HTMLTextAreaElement | null) => {
+              pasteFieldRef(element);
+              pasteRef.current = element;
+            },
+          }}
+          urlProps={{
+            ...urlField,
+            ref: (element: HTMLInputElement | null) => {
+              urlFieldRef(element);
+              urlRef.current = element;
+            },
+          }}
+          upload={upload}
+          onFiles={(files) => void onFiles(files)}
+          onRemove={(kind) => {
+            setUpload((current) => ({ ...current, [kind]: undefined }));
+            clearErrors();
+          }}
+          browseRef={browseRef}
+          error={sourceError}
+          pending={pending}
+        />
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button asChild variant="secondary">
