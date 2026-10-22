@@ -1,10 +1,16 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
 import { isDemoUser } from "../demo/demo-user";
+import { isDemoAuthPathAllowed } from "./demo-guard";
 import { demoSignIn } from "./demo-sign-in";
 import { sendMagicLinkEmail } from "./magic-link-email";
 
@@ -40,7 +46,35 @@ function createAuth() {
     account: { accountLinking: { allowDifferentEmails: true } },
     // "Delete account" requires a session younger than a day (freshAge).
     user: { deleteUser: { enabled: true } },
+    hooks: {
+      // Every demo visitor shares one user, so `/update-user`, `/delete-user`,
+      // `/list-sessions` and `/revoke-*` would act on all of them (plan.md
+      // 26.1). Allowed paths return before reading the session.
+      before: createAuthMiddleware(async (ctx) => {
+        if (isDemoAuthPathAllowed(ctx.path)) return;
+        const session = await getSessionFromCtx(ctx);
+        if (session && isDemoUser(session.user.id)) {
+          throw new APIError("FORBIDDEN", {
+            message: "Not available in the demo.",
+          });
+        }
+      }),
+    },
     databaseHooks: {
+      // A second layer under the hook above, for any path it misses.
+      user: {
+        update: {
+          // The update gets only the changed fields, without the user's id,
+          // so the demo is recognised by the session of the request.
+          before: async (_data, ctx) =>
+            ctx?.context.session && isDemoUser(ctx.context.session.user.id)
+              ? false
+              : undefined,
+        },
+        delete: {
+          before: async (row) => (isDemoUser(row.id) ? false : undefined),
+        },
+      },
       account: {
         create: {
           // A GitHub account linked to the shared demo user would follow
