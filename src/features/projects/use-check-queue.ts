@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { toast } from "@/components/ui/toast";
 import { queueCheck } from "./actions";
 import {
@@ -19,11 +19,13 @@ import {
  */
 export function useCheckQueue(pendingProjectIds: string[]): {
   queue: QueueState;
+  cooldowns: Record<string, string>;
   checkNow: (projectId: string) => void;
   forget: (projectId: string) => void;
 } {
   const router = useRouter();
   const [queue, dispatch] = useReducer(reduceQueue, initialQueue);
+  const [cooldowns, setCooldowns] = useState<Record<string, string>>({});
   const sources = useRef(new Map<string, EventSource>());
   const inFlight = useRef(new Set<string>());
   const mounted = useRef(false);
@@ -85,6 +87,13 @@ export function useCheckQueue(pendingProjectIds: string[]): {
               checkId: result.checkId,
             });
             follow(item.projectId, result.checkId);
+            return;
+          case "check-cooldown":
+            setCooldowns((previous) => ({
+              ...previous,
+              [item.projectId]: result.nextCheckAt,
+            }));
+            settle(item.projectId);
             return;
           case "limited":
             dispatch({
@@ -151,7 +160,7 @@ export function useCheckQueue(pendingProjectIds: string[]): {
     dispatch({ type: "settled", projectId });
   }, []);
 
-  return { queue, checkNow, forget };
+  return { queue, cooldowns, checkNow, forget };
 }
 
 // The payload comes from our own route handler; only its shape is guarded.

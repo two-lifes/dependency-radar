@@ -1,3 +1,4 @@
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReplaceSourceState } from "./replace-source-state";
@@ -129,4 +130,20 @@ describe("SourceSection", () => {
       screen.queryByRole("textbox", { name: "package.json contents" }),
     ).not.toBeInTheDocument();
   });
+});
+
+it("allows editing but blocks replacement during the server cooldown", () => {
+  render(
+    <SourceSection
+      projectId="p1"
+      source="paste"
+      repoUrl={null}
+      nextCheckAt={new Date(Date.now() + 60_000).toISOString()}
+    />,
+  );
+  openForm();
+  paste(MANIFEST);
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  expect(screen.getByRole("status")).toHaveTextContent(/Try again in \d+s\./);
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
 });

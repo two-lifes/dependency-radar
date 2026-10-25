@@ -61,6 +61,7 @@ export async function getCheckReportMeta(
 }
 
 const checkColumns = {
+  startedAt: checks.startedAt,
   id: checks.id,
   status: checks.status,
   failureReason: checks.failureReason,
@@ -70,6 +71,7 @@ const checkColumns = {
 };
 
 export type ReportCheck = {
+  startedAt: Date;
   id: string;
   status: (typeof checks.$inferSelect)["status"];
   failureReason: (typeof checks.$inferSelect)["failureReason"];

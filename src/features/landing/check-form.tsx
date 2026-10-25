@@ -23,6 +23,11 @@ import { landingCopy } from "./copy";
 import { Dropzone } from "./dropzone";
 import { SAMPLE_PACKAGE_JSON } from "./sample-package-json";
 import { addUploadedFiles, type UploadSelection } from "./upload-files";
+import {
+  GuestGithubButton,
+  GuestQuotaNotice,
+  useGuestQuota,
+} from "../guest-quota/guest-quota";
 
 const copy = landingCopy.form;
 
@@ -33,6 +38,11 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
     initialCheckFormState,
   );
   const [source, setSource] = useState<CheckSource>("paste");
+  const quota = useGuestQuota();
+  const exhausted =
+    quota.state.kind !== "account" &&
+    (state.code === "guest-quota-exhausted" ||
+      (quota.state.kind === "guest" && quota.state.remaining === 0));
   const [pasted, setPasted] = useState("");
   const [url, setUrl] = useState("");
   const [upload, setUpload] = useState<UploadSelection>({});
@@ -90,6 +100,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
   // is a Blob in state, and a form field can't carry it.
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (quota.blocked || exhausted || pending) return;
     if (source === "upload" && !upload.manifest) {
       setLocalError(
         upload.lockfile
@@ -201,19 +212,29 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
       ) : null}
 
       <div className="grid justify-items-center gap-2">
-        <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? (
-            <>
-              <Loader2
-                className="motion-safe:animate-spin"
-                aria-hidden="true"
-              />
-              {copy.pending}
-            </>
-          ) : (
-            copy.submit
-          )}
-        </Button>
+        <GuestQuotaNotice exhausted={exhausted} />
+        {exhausted ? (
+          <GuestGithubButton />
+        ) : (
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={pending || quota.blocked}
+          >
+            {pending ? (
+              <>
+                <Loader2
+                  className="motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                {copy.pending}
+              </>
+            ) : (
+              copy.submit
+            )}
+          </Button>
+        )}
         <button
           type="button"
           disabled={pending}

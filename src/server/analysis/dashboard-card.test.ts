@@ -13,6 +13,7 @@ function project(
   result: DashboardProject["result"] = null,
 ): DashboardProject {
   return {
+    nextCheckAt: null,
     id: "p1",
     name: "shop",
     source: "paste",

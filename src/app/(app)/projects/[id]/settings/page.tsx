@@ -17,6 +17,7 @@ export default async function ProjectSettingsPage({
     <ProjectSettingsLayout projectId={project.id}>
       <GeneralSection projectId={project.id} name={project.name} demo={demo} />
       <SourceSection
+        nextCheckAt={project.nextCheckAt}
         projectId={project.id}
         source={project.source}
         repoUrl={project.repoUrl}

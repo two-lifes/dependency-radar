@@ -1,3 +1,10 @@
+vi.mock("@/server/db/check-cooldown", () => ({
+  checkLaunchBlock: vi.fn(async () => null),
+}));
+// Quota accounting has its own PostgreSQL and action tests; these exercise hourly limits.
+vi.mock("@/server/guest-quota", () => ({
+  prepareGuestLaunch: async () => undefined,
+}));
 // @vitest-environment node
 import { http, HttpResponse } from "msw/http";
 import { refresh } from "next/cache";

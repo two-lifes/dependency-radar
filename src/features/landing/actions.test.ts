@@ -1,3 +1,7 @@
+// Quota accounting has its own PostgreSQL and action tests; these exercise hourly limits.
+vi.mock("@/server/guest-quota", () => ({
+  prepareGuestLaunch: async () => undefined,
+}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startGuestCheck } from "./actions";
 import { initialCheckFormState } from "./check-form-state";

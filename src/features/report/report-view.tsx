@@ -1,3 +1,4 @@
+import { nextCheckAt } from "@/lib/check-cooldown";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { toPackageRowJson } from "@/server/check/package-row";
@@ -19,6 +20,8 @@ import {
 import { ReportSummary, ReportSummarySkeleton } from "./report-summary";
 import { ReportTabs } from "./report-tabs";
 import { reportWarningCopy } from "./warning-copy";
+import { readGuestQuota } from "@/server/guest-quota";
+import { GuestQuotaProvider } from "../guest-quota/guest-quota";
 
 export type ReportViewMode =
   | { kind: "guest"; signedIn: boolean }
@@ -38,6 +41,10 @@ export async function ReportView({
   children: ReactNode;
 }) {
   const data = await getReportPage(getDb(), reportId);
+  const quota =
+    mode.kind === "guest"
+      ? await readGuestQuota()
+      : { kind: "account" as const };
   if (!data) notFound();
   const { report, check, previous } = data;
   const now = new Date();
@@ -74,74 +81,76 @@ export async function ReportView({
   return (
     // grid-cols-1 is minmax(0, 1fr): an implicit `auto` column would grow to
     // the min-content width of the scrolling tile strip on mobile.
-    <main className="mx-auto grid max-w-320 grid-cols-1 gap-6 px-4 pt-8 pb-16 sm:px-6">
-      <ReportProvider
-        key={`${check?.id}:${check?.status}`}
-        reportId={report.id}
-        guest={mode.kind === "guest"}
-        checkId={check?.id}
-        running={running}
-        packageManager={report.packageManager}
-        totalPackages={check?.totalPackages ?? report.dependencies.length}
-        dependencies={report.dependencies}
-        previousRows={previousRows.map(toPackageRowJson)}
-        currentRows={check?.rows.map(toPackageRowJson) ?? []}
-      >
-        <ReportHeader
+    <GuestQuotaProvider initial={quota} key={JSON.stringify(quota)}>
+      <main className="mx-auto grid max-w-320 grid-cols-1 gap-6 px-4 pt-8 pb-16 sm:px-6">
+        <ReportProvider
+          key={`${check?.id}:${check?.status}`}
           reportId={report.id}
-          mode={headerMode}
-          name={mode.kind === "project" ? mode.name : report.name}
-          source={source}
-          checkedAt={shown?.finishedAt?.toISOString() ?? null}
-          expiresAt={report.expiresAt?.toISOString() ?? null}
-          warnings={report.warnings.map((code) => reportWarningCopy[code])}
-        />
-        <CheckProgress />
-        {check?.status === "partial" || check?.status === "cancelled" ? (
-          <CheckBanner
-            status={check.status}
-            checkId={check.id}
-            sourceFailures={summary?.sourceFailures ?? 0}
-            basePath={basePath}
+          guest={mode.kind === "guest"}
+          checkId={check?.id}
+          running={running}
+          packageManager={report.packageManager}
+          totalPackages={check?.totalPackages ?? report.dependencies.length}
+          dependencies={report.dependencies}
+          previousRows={previousRows.map(toPackageRowJson)}
+          currentRows={check?.rows.map(toPackageRowJson) ?? []}
+        >
+          <ReportHeader
+            reportId={report.id}
+            mode={headerMode}
+            name={mode.kind === "project" ? mode.name : report.name}
+            source={source}
+            nextCheckAt={check ? nextCheckAt(check.startedAt) : null}
+            checkedAt={shown?.finishedAt?.toISOString() ?? null}
+            expiresAt={report.expiresAt?.toISOString() ?? null}
+            warnings={report.warnings.map((code) => reportWarningCopy[code])}
           />
-        ) : null}
-
-        {startFirst ? (
-          <FirstCheckStarter reportId={report.id} />
-        ) : failed ? (
-          <CheckFailed
-            reason={checkFailureCopy[check?.failureReason ?? "internal-error"](
-              check?.retryAt ?? null,
-              now,
-            )}
-            onTryAgain={
-              check
-                ? retry.bind(null, check.id)
-                : checkAgain.bind(null, report.id)
-            }
-          />
-        ) : (
-          <>
-            {summary ? (
-              <ReportSummary
-                score={summary.score}
-                counts={summary.counts}
-                basePath={basePath}
-              />
-            ) : (
-              <ReportSummarySkeleton />
-            )}
-            <ReportTabs
+          <CheckProgress />
+          {check?.status === "partial" || check?.status === "cancelled" ? (
+            <CheckBanner
+              status={check.status}
+              checkId={check.id}
+              sourceFailures={summary?.sourceFailures ?? 0}
               basePath={basePath}
-              dependencies={report.dependencies.length}
-              vulnerabilities={summary?.counts.vulnerabilities ?? null}
             />
-            {children}
-          </>
-        )}
-        <PackageCard />
-        {mode.kind === "project" ? <ProjectSavedToast /> : null}
-      </ReportProvider>
-    </main>
+          ) : null}
+
+          {startFirst ? (
+            <FirstCheckStarter reportId={report.id} />
+          ) : failed ? (
+            <CheckFailed
+              reason={checkFailureCopy[
+                check?.failureReason ?? "internal-error"
+              ](check?.retryAt ?? null, now)}
+              onTryAgain={
+                check
+                  ? retry.bind(null, check.id)
+                  : checkAgain.bind(null, report.id)
+              }
+            />
+          ) : (
+            <>
+              {summary ? (
+                <ReportSummary
+                  score={summary.score}
+                  counts={summary.counts}
+                  basePath={basePath}
+                />
+              ) : (
+                <ReportSummarySkeleton />
+              )}
+              <ReportTabs
+                basePath={basePath}
+                dependencies={report.dependencies.length}
+                vulnerabilities={summary?.counts.vulnerabilities ?? null}
+              />
+              {children}
+            </>
+          )}
+          <PackageCard />
+          {mode.kind === "project" ? <ProjectSavedToast /> : null}
+        </ReportProvider>
+      </main>
+    </GuestQuotaProvider>
   );
 }

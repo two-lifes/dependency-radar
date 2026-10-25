@@ -1,8 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { NuqsTestingAdapter, type UrlUpdateEvent } from "nuqs/adapters/testing";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportActionResult } from "./actions";
 import { ProjectSavedToast } from "./project-saved-toast";
+import { GuestQuotaProvider } from "../guest-quota/guest-quota";
 import { ReportHeader, type ReportHeaderMode } from "./report-header";
 
 const actions = vi.hoisted(() => ({
@@ -107,4 +109,75 @@ describe("ProjectSavedToast", () => {
 
     expect(toasts.toast).not.toHaveBeenCalled();
   });
+});
+
+describe("report cooldown UI", () => {
+  afterEach(() => vi.useRealTimers());
+  it("disables only the new check and enables it at the deadline", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-25T12:00:01Z"));
+    render(
+      <ReportHeader
+        reportId="r1"
+        mode={{ kind: "guest", signedIn: true }}
+        name="shop"
+        source={{ kind: "paste" }}
+        checkedAt={null}
+        expiresAt={null}
+        warnings={[]}
+        nextCheckAt="2026-10-25T12:01:00.000Z"
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Check again in 59s" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Save project" })).toBeEnabled();
+    act(() => {
+      vi.advanceTimersByTime(59_000);
+    });
+    expect(screen.getByRole("button", { name: "Check again" })).toBeEnabled();
+  });
+  it("immediately shows a cooldown returned to stale UI", async () => {
+    actions.checkAgain.mockResolvedValueOnce({
+      code: "check-cooldown",
+      nextCheckAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const header = renderHeader({
+      kind: "project",
+      settingsHref: "/projects/p1/settings",
+    });
+    await act(async () =>
+      fireEvent.click(header.getByRole("button", { name: "Check again" })),
+    );
+    expect(
+      header.getByRole("button", { name: /Check again in/ }),
+    ).toBeDisabled();
+  });
+});
+
+it("keeps sign-in as the CTA at zero even during cooldown", () => {
+  render(
+    <GuestQuotaProvider initial={{ kind: "guest", remaining: 0 }}>
+      <ReportHeader
+        reportId="r1"
+        mode={{ kind: "guest", signedIn: false }}
+        name="shop"
+        source={{ kind: "paste" }}
+        checkedAt={null}
+        expiresAt={null}
+        warnings={[]}
+        nextCheckAt={new Date(Date.now() + 60_000).toISOString()}
+      />
+    </GuestQuotaProvider>,
+  );
+  expect(
+    screen.getByRole("button", { name: "Continue with GitHub" }),
+  ).toBeEnabled();
+  expect(
+    screen.queryByRole("button", { name: /Check again/ }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: "Save project" }),
+  ).toBeInTheDocument();
 });

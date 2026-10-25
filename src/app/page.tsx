@@ -1,16 +1,18 @@
 import { GuestHeader } from "@/components/guest-header";
 import { SiteFooter } from "@/components/site-footer";
-import { Button } from "@/components/ui/button";
 import { startGuestCheck } from "@/features/landing/actions";
 import { CheckForm } from "@/features/landing/check-form";
 import { landingCopy as copy } from "@/features/landing/copy";
 import { RadarIllustration } from "@/features/landing/radar-illustration";
 import { AccountDeletedToast } from "@/features/profile/account-deleted-toast";
 import { getOptionalSession } from "@/server/auth/session";
+import { readGuestQuota } from "@/server/guest-quota";
+import { GuestQuotaProvider } from "@/features/guest-quota/guest-quota";
 
 /** screens 5.1 */
 export default async function HomePage() {
   const session = await getOptionalSession();
+  const quota = await readGuestQuota();
   return (
     <>
       <GuestHeader signedIn={session !== null} />
@@ -25,7 +27,9 @@ export default async function HomePage() {
               {copy.hero.subtitle}
             </p>
           </div>
-          <CheckForm action={startGuestCheck} />
+          <GuestQuotaProvider initial={quota} key={JSON.stringify(quota)}>
+            <CheckForm action={startGuestCheck} />
+          </GuestQuotaProvider>
           <p className="text-center text-sm text-muted-foreground">
             {copy.trust}
           </p>
@@ -75,9 +79,6 @@ export default async function HomePage() {
           {/* The report screenshot replaces the illustration in task 29. */}
           <div className="grid justify-items-center gap-6 rounded-xl border border-border p-6 sm:p-10">
             <RadarIllustration className="max-w-140" />
-            <Button asChild variant="secondary">
-              <a href="/demo">{copy.example.openDemo}</a>
-            </Button>
           </div>
         </section>
       </main>

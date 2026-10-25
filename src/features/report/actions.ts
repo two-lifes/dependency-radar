@@ -1,5 +1,6 @@
 "use server";
 
+import { checkLaunchBlock } from "@/server/db/check-cooldown";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -22,6 +23,9 @@ import { canOpenReport } from "@/server/report-access";
 import { tooManyChecks } from "../check/copy";
 import { readRepoInput } from "../check/read-repo";
 import { savedReportPath } from "./saved-report";
+import { prepareGuestLaunch } from "@/server/guest-quota";
+import { GuestQuotaExhausted } from "@/server/db/guest-quota";
+import { guestQuotaCopy } from "../guest-quota/copy";
 
 // screens 5.4 report actions. Every outcome ends in a refresh: the page reads
 // the check state from the database, so "already running", "not running" or
@@ -31,7 +35,12 @@ import { savedReportPath } from "./saved-report";
 // changes then. Someone else's project is treated as a missing report
 // (decisions 45), before the check counts against the limit.
 
-export type ReportActionResult = { error?: string };
+export type ReportActionResult = {
+  error?: string;
+  code?: "guest-quota-exhausted" | "check-cooldown";
+  nextCheckAt?: string;
+  remaining?: 0;
+};
 
 const idSchema = z.uuid();
 
@@ -39,29 +48,52 @@ export async function checkAgain(
   reportId: string,
 ): Promise<ReportActionResult> {
   if (!idSchema.safeParse(reportId).success) return {};
-  const db = getDb();
-  const report = await getReportMeta(db, reportId);
-  if (
-    report &&
-    (await canOpenReport(report)) &&
-    !isReportExpired(report.expiresAt, new Date())
-  ) {
-    const allowed = await consumeCheck();
-    if (!allowed.ok) {
-      return { error: tooManyChecks(allowed.error.retryAfterSeconds) };
+  try {
+    const db = getDb();
+    const report = await getReportMeta(db, reportId);
+    if (
+      report &&
+      (await canOpenReport(report)) &&
+      !isReportExpired(report.expiresAt, new Date())
+    ) {
+      const blocked = await checkLaunchBlock(db, reportId);
+      if (blocked?.error === "check-cooldown")
+        return { code: "check-cooldown", nextCheckAt: blocked.nextCheckAt };
+      if (blocked) {
+        refresh();
+        return {};
+      }
+      const guestId = await prepareGuestLaunch();
+      const allowed = await consumeCheck();
+      if (!allowed.ok) {
+        return { error: tooManyChecks(allowed.error.retryAfterSeconds) };
+      }
+      // decisions 42: a repository report checks what the repository holds now.
+      // A failed read starts nothing and leaves the report as it was.
+      let input: ReportInput | undefined;
+      if (report.source === "github" && report.repoUrl) {
+        const read = await readRepoInput(report.repoUrl);
+        if (!read.ok) return { error: read.error };
+        input = read.value.input;
+      }
+      const result = await startCheck(
+        createPgCheckStore(db, guestId),
+        reportId,
+        input,
+      );
+      if (!result.ok && result.error === "check-cooldown")
+        return { code: "check-cooldown", nextCheckAt: result.nextCheckAt };
+      if (!result.ok && result.error === "guest-quota-exhausted")
+        return { code: "guest-quota-exhausted", remaining: 0 };
     }
-    // decisions 42: a repository report checks what the repository holds now.
-    // A failed read starts nothing and leaves the report as it was.
-    let input: ReportInput | undefined;
-    if (report.source === "github" && report.repoUrl) {
-      const read = await readRepoInput(report.repoUrl);
-      if (!read.ok) return { error: read.error };
-      input = read.value.input;
-    }
-    await startCheck(createPgCheckStore(db), reportId, input);
+    refresh();
+    return {};
+  } catch (error) {
+    if (error instanceof GuestQuotaExhausted)
+      return { code: "guest-quota-exhausted", remaining: 0 };
+    console.error("[report] couldn't start check", error);
+    return { error: guestQuotaCopy.startFailed };
   }
-  refresh();
-  return {};
 }
 
 export async function cancel(checkId: string): Promise<ReportActionResult> {

@@ -1,5 +1,9 @@
+vi.mock("@/server/db/check-cooldown", () => ({
+  checkLaunchBlock: vi.fn(async () => null),
+}));
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { checkLaunchBlock } from "@/server/db/check-cooldown";
 import { DEMO_USER } from "@/server/demo/demo-user";
 import { initialReplaceSourceState } from "../project-settings/replace-source-state";
 import {
@@ -213,6 +217,20 @@ describe("queueCheck", () => {
     state.project = undefined;
   });
 
+  it("returns a project cooldown without consuming the hourly limit", async () => {
+    const nextCheckAt = "2026-10-25T15:00:00.000Z";
+    vi.mocked(checkLaunchBlock).mockResolvedValueOnce({
+      error: "check-cooldown",
+      nextCheckAt,
+    });
+    expect(await queueCheck(PROJECT_ID, true)).toEqual({
+      kind: "check-cooldown",
+      nextCheckAt,
+    });
+    expect(state.count).toBe(0);
+    expect(control.startCheck).not.toHaveBeenCalled();
+  });
+
   it("follows a running check without counting it", async () => {
     withLatest({ id: "c1", status: "running" });
     expect(await queueCheck(PROJECT_ID, false)).toEqual({
@@ -363,6 +381,21 @@ describe("replaceSource", () => {
 
   const replace = (fields: Record<string, string>) =>
     replaceSource(PROJECT_ID, initialReplaceSourceState, form(fields));
+
+  it("preserves the source and hourly counter during cooldown", async () => {
+    const nextCheckAt = "2026-10-25T15:00:00.000Z";
+    vi.mocked(checkLaunchBlock).mockResolvedValueOnce({
+      error: "check-cooldown",
+      nextCheckAt,
+    });
+    expect(await replace({ source: "paste", packageJson: MANIFEST })).toEqual({
+      attempt: 1,
+      code: "check-cooldown",
+      nextCheckAt,
+    });
+    expect(state.count).toBe(0);
+    expect(control.startCheck).not.toHaveBeenCalled();
+  });
 
   it("checks the pasted package.json as the new source and opens the report", async () => {
     await expect(

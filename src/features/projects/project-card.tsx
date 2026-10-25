@@ -20,6 +20,8 @@ import {
 import { cn } from "@/lib/cn";
 import type { DashboardProject } from "@/server/analysis/dashboard-card";
 import { type ScoreBand, scoreBand } from "@/server/analysis/health-score";
+import { checkCooldownCopy } from "@/lib/check-cooldown";
+import { useCheckCooldown } from "../check/use-check-cooldown";
 import { tooManyChecks } from "../check/copy";
 import { demoCopy } from "../demo/copy";
 import { RelativeTime } from "../report/relative-time";
@@ -45,13 +47,20 @@ export function ProjectCard({
   status,
   onCheckNow,
   onDelete,
+  nextCheckAt,
 }: {
   project: DashboardProject;
+  nextCheckAt?: string;
   status: DisplayStatus;
   onCheckNow: () => void;
   onDelete: () => void;
 }) {
   const { result } = project;
+  const cooldown = useCheckCooldown(
+    nextCheckAt && (!project.nextCheckAt || nextCheckAt > project.nextCheckAt)
+      ? nextCheckAt
+      : project.nextCheckAt,
+  );
   // The seeded demo projects are shared by every visitor (plan.md 26.1).
   const locked = !project.editable;
   const score = result?.score ?? null;
@@ -93,11 +102,15 @@ export function ProjectCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              disabled={checking || status.kind === "queued"}
+              disabled={
+                checking || status.kind === "queued" || cooldown.seconds > 0
+              }
               onSelect={onCheckNow}
             >
               <RefreshCw aria-hidden />
-              {copy.checkNow}
+              {cooldown.seconds > 0
+                ? checkCooldownCopy.now(cooldown.seconds)
+                : copy.checkNow}
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href={`/projects/${project.id}/settings`}>

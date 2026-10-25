@@ -1,3 +1,5 @@
+import { nextCheckAt } from "@/lib/check-cooldown";
+import { reportNextCheckAt } from "./check-cooldown";
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { DashboardProject } from "../analysis/dashboard-card";
 import {
@@ -144,6 +146,7 @@ export function createProjectWithCheck(
 }
 
 export type ProjectSettings = {
+  nextCheckAt: string | null;
   id: string;
   name: string;
   reportId: string;
@@ -177,6 +180,7 @@ export async function getProjectSettings(
   const { ownerId, demoSessionId, ...settings } = found;
   return {
     ...settings,
+    nextCheckAt: await reportNextCheckAt(db, settings.reportId),
     editable: projectAccess({ ownerId, demoSessionId }, viewer) === "write",
   };
 }
@@ -254,6 +258,7 @@ export async function listProjects(
         reportId: checks.reportId,
         id: checks.id,
         status: checks.status,
+        startedAt: checks.startedAt,
         totalPackages: checks.totalPackages,
       })
       .from(checks)
@@ -303,6 +308,7 @@ export async function listProjects(
       source,
       repoUrl,
       editable: projectAccess(project, viewer) === "write",
+      nextCheckAt: check ? nextCheckAt(check.startedAt) : null,
       latest: check
         ? {
             id: check.id,

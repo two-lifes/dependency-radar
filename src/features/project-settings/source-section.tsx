@@ -21,6 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { checkCooldownCopy } from "@/lib/check-cooldown";
+import { useCheckCooldown } from "../check/use-check-cooldown";
 import { githubErrorCopy } from "../check/copy";
 import { DemoHint } from "../demo/demo-hint";
 import type { CheckSource } from "../landing/check-form-state";
@@ -53,12 +55,14 @@ export function SourceSection({
   source,
   repoUrl,
   demo = false,
+  nextCheckAt,
 }: {
   projectId: string;
   source: CheckSource;
   repoUrl: string | null;
   /** A seeded demo project is shared by every visitor (plan.md 26.1). */
   demo?: boolean;
+  nextCheckAt?: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const replaceRef = useRef<HTMLButtonElement>(null);
@@ -69,6 +73,7 @@ export function SourceSection({
       <CurrentSource source={source} repoUrl={repoUrl} />
       {editing ? (
         <ReplaceSourceForm
+          nextCheckAt={nextCheckAt}
           projectId={projectId}
           onCancel={() => {
             setEditing(false);
@@ -129,13 +134,20 @@ function CurrentSource({
 function ReplaceSourceForm({
   projectId,
   onCancel,
+  nextCheckAt,
 }: {
   projectId: string;
   onCancel: () => void;
+  nextCheckAt?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(
     replaceSource.bind(null, projectId),
     initialReplaceSourceState,
+  );
+  const cooldown = useCheckCooldown(
+    state.nextCheckAt && (!nextCheckAt || state.nextCheckAt > nextCheckAt)
+      ? state.nextCheckAt
+      : nextCheckAt,
   );
   const { register, handleSubmit, setValue, control } = useForm<SourceValues>({
     defaultValues: emptyForm,
@@ -203,7 +215,7 @@ function ReplaceSourceForm({
   };
 
   const confirm = () => {
-    if (!confirming) return;
+    if (!confirming || cooldown.seconds > 0) return;
     const formData = confirming;
     setConfirming(null);
     startTransition(() => formAction(formData));
@@ -264,7 +276,7 @@ function ReplaceSourceForm({
           >
             {copy.cancel}
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || cooldown.seconds > 0}>
             {pending ? (
               <>
                 <Loader2 className="motion-safe:animate-spin" aria-hidden />
@@ -277,6 +289,11 @@ function ReplaceSourceForm({
         </div>
       </form>
 
+      {cooldown.seconds > 0 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {checkCooldownCopy.retry(cooldown.seconds)}
+        </p>
+      ) : null}
       <Dialog
         open={confirming !== null}
         onOpenChange={(open) => {
@@ -292,7 +309,9 @@ function ReplaceSourceForm({
             <DialogClose asChild>
               <Button variant="secondary">{copy.confirm.cancel}</Button>
             </DialogClose>
-            <Button onClick={confirm}>{copy.confirm.confirm}</Button>
+            <Button onClick={confirm} disabled={cooldown.seconds > 0}>
+              {copy.confirm.confirm}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

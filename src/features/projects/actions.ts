@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { ReportInput } from "@/server/analysis/report-input";
 import type { Result } from "@/server/analysis/result";
 import { requireSession, viewerOf } from "@/server/auth/session";
+import { checkLaunchBlock } from "@/server/db/check-cooldown";
 import { resumeCheck, startCheck } from "@/server/check/check-control";
 import { getGithubAccountId } from "@/server/db/accounts";
 import { createPgCheckStore } from "@/server/db/check-store";
@@ -161,6 +162,7 @@ function repoName(repoUrl: string | undefined): string {
 }
 
 export type QueueCheckResult =
+  | { kind: "check-cooldown"; nextCheckAt: string }
   | { kind: "started"; checkId: string }
   /** Nothing to check: finished meanwhile, deleted, or not this user's. */
   | { kind: "skipped" }
@@ -189,6 +191,13 @@ export async function queueCheck(
   const resumable = !fresh && latest?.status === "cancelled";
   if (!fresh && latest !== null && !resumable) return { kind: "skipped" };
 
+  if (!resumable) {
+    const blocked = await checkLaunchBlock(db, project.reportId);
+    if (blocked?.error === "check-cooldown")
+      return { kind: "check-cooldown", nextCheckAt: blocked.nextCheckAt };
+    if (blocked) return { kind: "skipped" };
+  }
+
   const allowed = await consumeCheck();
   if (!allowed.ok) {
     return {
@@ -211,6 +220,8 @@ export async function queueCheck(
     input = read.value.input;
   }
   const started = await startCheck(store, project.reportId, input);
+  if (!started.ok && started.error === "check-cooldown")
+    return { kind: "check-cooldown", nextCheckAt: started.nextCheckAt };
   return started.ok
     ? { kind: "started", checkId: started.value.checkId }
     : { kind: "skipped" };
@@ -284,6 +295,22 @@ export async function replaceSource(
   }
   const form = parsed.data;
 
+  const blocked = await checkLaunchBlock(db, project.reportId);
+  if (blocked?.error === "check-cooldown")
+    return {
+      attempt,
+      code: "check-cooldown",
+      nextCheckAt: blocked.nextCheckAt,
+    };
+  if (blocked)
+    return {
+      attempt,
+      error: {
+        field: form.source,
+        message: projectSettingsCopy.source.alreadyRunning,
+      },
+    };
+
   const allowed = await consumeCheck();
   if (!allowed.ok) {
     return {
@@ -306,6 +333,12 @@ export async function replaceSource(
     input,
     { source, repoUrl: repoUrl ?? null },
   );
+  if (!started.ok && started.error === "check-cooldown")
+    return {
+      attempt,
+      code: "check-cooldown",
+      nextCheckAt: started.nextCheckAt,
+    };
   if (!started.ok) {
     return {
       attempt,

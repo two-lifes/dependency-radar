@@ -21,10 +21,17 @@ import {
 import { toast } from "@/components/ui/toast";
 import { formatDayMonth } from "@/lib/format-time";
 import { checkAgain, saveReport } from "./actions";
+import { useCheckCooldown } from "../check/use-check-cooldown";
+import { checkCooldownCopy } from "@/lib/check-cooldown";
 import { reportCopy } from "./copy";
 import { RelativeTime } from "./relative-time";
 import { useReport } from "./report-context";
 import { useReportAction } from "./use-report-action";
+import {
+  GuestGithubButton,
+  GuestQuotaNotice,
+  useGuestQuota,
+} from "../guest-quota/guest-quota";
 
 const copy = reportCopy;
 
@@ -46,6 +53,7 @@ export function ReportHeader({
   name,
   source,
   checkedAt,
+  nextCheckAt,
   expiresAt,
   warnings,
 }: {
@@ -55,22 +63,34 @@ export function ReportHeader({
   source: ReportSource;
   /** When the shown results were checked; null before the first check ends. */
   checkedAt: string | null;
+  nextCheckAt?: string | null;
   expiresAt: string | null;
   warnings: string[];
 }) {
   const { running } = useReport();
   const [pending, run] = useReportAction();
-  const checkDisabled = running || pending;
+  const quota = useGuestQuota();
+  const cooldown = useCheckCooldown(nextCheckAt);
+  const exhausted = quota.state.kind === "guest" && quota.state.remaining === 0;
+  const checkDisabled =
+    running || pending || quota.blocked || cooldown.seconds > 0;
   const checkLabel =
     pending && source.kind === "github"
       ? copy.actions.fetchingRepository
-      : copy.actions.checkAgain;
+      : cooldown.seconds > 0
+        ? checkCooldownCopy.again(cooldown.seconds)
+        : copy.actions.checkAgain;
 
   const [saving, startSaving] = useTransition();
   // saveReport ends in a redirect to the project.
   const onSave = () => startSaving(() => saveReport(reportId));
 
-  const onCheckAgain = () => run(() => checkAgain(reportId));
+  const onCheckAgain = () =>
+    run(async () => {
+      const result = await checkAgain(reportId);
+      if (result.nextCheckAt) cooldown.setDeadline(result.nextCheckAt);
+      return result;
+    });
   const onCopyLink = async () => {
     try {
       // The current URL carries the open tab and its filters.
@@ -113,7 +133,7 @@ export function ReportHeader({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {mode.kind === "project" ? (
             <Button disabled={checkDisabled} onClick={onCheckAgain}>
               {pending ? (
@@ -154,6 +174,8 @@ export function ReportHeader({
                 <Settings aria-hidden />
               </Link>
             </Button>
+          ) : exhausted ? (
+            <GuestGithubButton />
           ) : (
             <Button
               variant="secondary"
@@ -193,7 +215,7 @@ export function ReportHeader({
                     {copy.actions.settings}
                   </Link>
                 </DropdownMenuItem>
-              ) : (
+              ) : exhausted ? null : (
                 <DropdownMenuItem
                   disabled={checkDisabled}
                   onSelect={onCheckAgain}
@@ -204,6 +226,11 @@ export function ReportHeader({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          {quota.state.kind !== "account" ? (
+            <div className="flex basis-full justify-end text-right">
+              <GuestQuotaNotice />
+            </div>
+          ) : null}
         </div>
       </div>
 

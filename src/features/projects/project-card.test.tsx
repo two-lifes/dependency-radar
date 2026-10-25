@@ -1,3 +1,4 @@
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import type { DisplayStatus } from "./check-queue";
 import { ProjectCard } from "./project-card";
 
 const project: DashboardProject = {
+  nextCheckAt: null,
   id: "p1",
   name: "shop-frontend",
   source: "github",

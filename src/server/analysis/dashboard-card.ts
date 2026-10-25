@@ -2,6 +2,7 @@ import type { FinishedCheckStatus } from "../check/events";
 
 /** One project as the dashboard loads it (screens 5.10). */
 export type DashboardProject = {
+  nextCheckAt: string | null;
   id: string;
   name: string;
   source: "paste" | "upload" | "github";

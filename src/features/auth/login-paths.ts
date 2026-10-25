@@ -21,5 +21,5 @@ export function checkEmailPath(email: string, next: string): string {
 
 /** screens 5.2: the save hint shows when sign-in started from a guest report. */
 export function isFromGuestReport(next: string): boolean {
-  return next.startsWith("/r/");
+  return /^\/r\/[^/?]+\/save(?:\?|$)/.test(next);
 }

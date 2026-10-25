@@ -2,10 +2,8 @@
 export const landingCopy = {
   header: {
     home: "Dependency Radar home",
-    tryDemo: "Try demo",
     signIn: "Sign in",
     dashboard: "Dashboard",
-    menu: "Open menu",
   },
   hero: {
     title:
@@ -59,8 +57,7 @@ export const landingCopy = {
   },
   example: {
     title: "See a real report",
-    text: "Explore a demo account with projects in every state.",
-    openDemo: "Open live demo",
+    text: "See outdated packages, vulnerabilities and upgrade priorities in one place.",
   },
   footer: {
     repo: "GitHub repo",

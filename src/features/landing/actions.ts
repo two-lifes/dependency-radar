@@ -9,6 +9,8 @@ import { tooManyChecks } from "../check/copy";
 import { prepareReport } from "../check/prepare-input";
 import type { CheckFormState } from "./check-form-state";
 import { landingCopy } from "./copy";
+import { prepareGuestLaunch } from "@/server/guest-quota";
+import { GuestQuotaExhausted } from "@/server/db/guest-quota";
 
 const formSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("paste"), packageJson: z.string() }),
@@ -39,9 +41,13 @@ export async function startGuestCheck(
 
   // Before reading GitHub: an over-limit request shouldn't spend its quota.
   let allowed: Awaited<ReturnType<typeof consumeCheck>>;
+  let guestId: string | undefined;
   try {
+    guestId = await prepareGuestLaunch();
     allowed = await consumeCheck();
   } catch (error) {
+    if (error instanceof GuestQuotaExhausted)
+      return { attempt, code: "guest-quota-exhausted", remaining: 0 };
     console.error("[landing] couldn't count the check", error);
     return {
       attempt,
@@ -68,8 +74,15 @@ export async function startGuestCheck(
 
   let reportId: string;
   try {
-    ({ reportId } = await createGuestReport(getDb(), outcome.report));
+    ({ reportId } = await createGuestReport(
+      getDb(),
+      outcome.report,
+      new Date(),
+      guestId,
+    ));
   } catch (error) {
+    if (error instanceof GuestQuotaExhausted)
+      return { attempt, code: "guest-quota-exhausted", remaining: 0 };
     console.error("[landing] couldn't create a guest report", error);
     return {
       attempt,
