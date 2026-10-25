@@ -3,7 +3,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { startGuestCheck } from "@/features/landing/actions";
 import { CheckForm } from "@/features/landing/check-form";
 import { landingCopy as copy } from "@/features/landing/copy";
-import { RadarIllustration } from "@/features/landing/radar-illustration";
+import Image from "next/image";
 import { AccountDeletedToast } from "@/features/profile/account-deleted-toast";
 import { getOptionalSession } from "@/server/auth/session";
 import { readGuestQuota } from "@/server/guest-quota";
@@ -76,9 +76,23 @@ export default async function HomePage() {
             </h2>
             <p className="text-md text-muted-foreground">{copy.example.text}</p>
           </div>
-          {/* The report screenshot replaces the illustration in task 29. */}
-          <div className="grid justify-items-center gap-6 rounded-xl border border-border p-6 sm:p-10">
-            <RadarIllustration className="max-w-140" />
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <Image
+              src="/images/report-light.png"
+              alt={copy.example.imageAlt}
+              width={1280}
+              height={970}
+              sizes="(max-width: 720px) 100vw, 720px"
+              className="h-auto w-full dark:hidden"
+            />
+            <Image
+              src="/images/report-dark.png"
+              alt={copy.example.imageAlt}
+              width={1280}
+              height={970}
+              sizes="(max-width: 720px) 100vw, 720px"
+              className="hidden h-auto w-full dark:block"
+            />
           </div>
         </section>
       </main>

@@ -58,6 +58,8 @@ export const landingCopy = {
   example: {
     title: "See a real report",
     text: "See outdated packages, vulnerabilities and upgrade priorities in one place.",
+    imageAlt:
+      "Sample dependency report with a health score, outdated packages, vulnerabilities and update commands.",
   },
   footer: {
     repo: "GitHub repo",

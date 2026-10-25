@@ -119,6 +119,12 @@ async function noPageOverflow(page: Page) {
 }
 
 async function insideViewport(locator: Locator) {
+  // Measure the settled layout, not the 4px entry translation during pop-in.
+  await locator.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished),
+    );
+  });
   const bounds = await locator.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return {
@@ -316,13 +322,19 @@ for (const colorScheme of ["light", "dark"] as const) {
         dialog.getByRole("heading", { name: longName, exact: true }),
       ).toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(dialog).not.toBeVisible();
+      await expect(page).not.toHaveURL(/[?&]pkg=/);
       await expect(card).toBeFocused();
       await keyboardFocus(
         page,
         page.getByRole("link", { name: "Vulnerabilities (1)", exact: true }),
       );
       await page.keyboard.press("Enter");
-      await expect(page.getByText(/Fixed in 2\.0\.0/)).toBeVisible();
+      await expect(
+        page
+          .getByRole("region", { name: "Vulnerabilities by severity" })
+          .getByText(/Fixed in 2\.0\.0/),
+      ).toBeVisible();
       await noPageOverflow(page);
     });
 
