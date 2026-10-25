@@ -53,6 +53,10 @@ jobs:
       # Throwaway credentials of the service container above, not a secret.
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/radar
       # plan.md assumption 2: fake npm and OSV (src/server/sources/mock).
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/radar
+      BETTER_AUTH_SECRET: local-quota-test-secret-at-least-32-characters
+      GITHUB_TOKEN: local-mock-only
+      CRON_SECRET: local-cron-test
       MOCK_EXTERNAL: "1"
       MOCK_EXTERNAL_DELAY_MS: "200"
     steps:
@@ -66,6 +70,7 @@ jobs:
           require-lockfile: true
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm db:migrate
+      - run: pnpm test:integration
       - run: pnpm test:e2e
       - if: failure()
         uses: actions/upload-artifact@v7

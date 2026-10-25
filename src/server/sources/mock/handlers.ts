@@ -257,6 +257,24 @@ const batchSchema = z.object({
 });
 
 export const mockHandlers = [
+  http.get(`${GITHUB_API_URL}/repos/quota-test/:repo`, ({ params }) =>
+    params.repo === "missing"
+      ? new HttpResponse(null, { status: 404 })
+      : HttpResponse.json({ private: false }),
+  ),
+  http.get(`${GITHUB_API_URL}/repos/quota-test/:repo/contents/`, () =>
+    HttpResponse.json([{ name: "package.json" }]),
+  ),
+  http.get(
+    `${GITHUB_API_URL}/repos/quota-test/:repo/contents/package.json`,
+    () =>
+      HttpResponse.text(
+        JSON.stringify({
+          name: "quota-repository",
+          dependencies: { react: "^18.0.0" },
+        }),
+      ),
+  ),
   http.get(`${NPM_REGISTRY_URL}/*`, async ({ request }) => {
     const name = decodeURIComponent(new URL(request.url).pathname.slice(1));
     await slow();

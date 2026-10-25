@@ -45,7 +45,7 @@ test.describe("sign-in", () => {
       "/api/auth/magic-link/verify?token=unknown&callbackURL=%2Fprojects&errorCallbackURL=%2Flogin%3Freason%3Dlink-expired",
     );
     await expect(page).toHaveURL(/\/login\?reason=link-expired/);
-    await expect(page.getByRole("alert")).toHaveText(
+    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
       "This link has expired. Request a new one.",
     );
   });
