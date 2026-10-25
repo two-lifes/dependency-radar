@@ -26,13 +26,12 @@ export async function isDemoSeeded(db: Db): Promise<boolean> {
 }
 
 /**
- * (Re)creates the demo account's data (screens 7): `pnpm db:seed`, `/demo` on
- * a fresh database and the daily reset. Sessions stay, so visitors already in
- * the demo keep going; everything they changed is replaced.
+ * Manually recreates historical fixtures (screens 7): `pnpm db:seed`.
+ * No route or scheduled job calls this; old sessions remain denied access.
  */
 export function seedDemo(db: Db, now: Date = new Date()): Promise<void> {
   return db.transaction(async (tx) => {
-    // Two seeds at once (the daily reset and `/demo` on an empty database)
+    // Concurrent manual seeds
     // would both delete nothing and insert the projects twice.
     await tx.execute(sql`select pg_advisory_xact_lock(${DEMO_SEED_LOCK})`);
     await tx

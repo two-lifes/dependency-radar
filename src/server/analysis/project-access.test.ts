@@ -19,14 +19,14 @@ describe("projectAccess", () => {
     expect(projectAccess(adaProject, null)).toBe("none");
   });
 
-  it("opens seeded demo projects to every demo session read-only", () => {
-    expect(projectAccess(seeded, demoA)).toBe("read");
-    expect(projectAccess(seeded, demoB)).toBe("read");
+  it("denies seeded demo projects to every old session", () => {
+    expect(projectAccess(seeded, demoA)).toBe("none");
+    expect(projectAccess(seeded, demoB)).toBe("none");
     expect(projectAccess(seeded, ada)).toBe("none");
   });
 
-  it("keeps a demo session's project to that session", () => {
-    expect(projectAccess(demoAProject, demoA)).toBe("write");
+  it("denies even the demo session's own project", () => {
+    expect(projectAccess(demoAProject, demoA)).toBe("none");
     expect(projectAccess(demoAProject, demoB)).toBe("none");
   });
 
@@ -38,8 +38,8 @@ describe("projectAccess", () => {
 });
 
 describe("newProjectSession", () => {
-  it("ties a new project to the demo session only", () => {
-    expect(newProjectSession(demoA)).toBe("s-a");
+  it("refuses project creation for old demo sessions", () => {
+    expect(() => newProjectSession(demoA)).toThrow("Demo access is closed");
     expect(newProjectSession(ada)).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { loginPath, safeNext } from "@/lib/safe-next";
 import type { Viewer } from "../analysis/project-access";
 import { type Auth, getAuth } from "./auth";
 import { REQUEST_PATH_HEADER } from "./session-header";
+import { isDemoUser } from "../demo/demo-user";
 
 export type Session = NonNullable<
   Awaited<ReturnType<Auth["api"]["getSession"]>>
@@ -18,7 +19,8 @@ export async function getSession(): Promise<Session | null> {
   // headers() first: at build time it stops prerendering before Better Auth
   // is created, so the build needs no auth env.
   const requestHeaders = await headers();
-  return getAuth().api.getSession({ headers: requestHeaders });
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  return session && !isDemoUser(session.user.id) ? session : null;
 }
 
 /**
@@ -45,7 +47,8 @@ export async function getOptionalSession(): Promise<Session | null> {
   // route dynamic, and that must reach Next.js.
   const requestHeaders = await headers();
   try {
-    return await getAuth().api.getSession({ headers: requestHeaders });
+    const session = await getAuth().api.getSession({ headers: requestHeaders });
+    return session && !isDemoUser(session.user.id) ? session : null;
   } catch (error) {
     console.error("[auth] couldn't read the session", error);
     return null;

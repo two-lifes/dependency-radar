@@ -1,7 +1,7 @@
 name: Daily
 
-# decisions 11: deletes expired guest reports and api_cache rows, resets the
-# demo account. CRON_SECRET (also set in Vercel) and APP_URL are set by the author.
+# decisions 11, 53: deletes expired guest reports and api_cache rows.
+# CRON_SECRET (also set in Vercel) and APP_URL are set by the author.
 on:
   schedule:
     - cron: "0 3 * * *"

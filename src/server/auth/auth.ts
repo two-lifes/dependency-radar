@@ -13,7 +13,6 @@ import { getDb } from "../db/client";
 import { account, session, user, verification } from "../db/schema";
 import { isDemoUser } from "../demo/demo-user";
 import { isDemoAuthPathAllowed } from "./demo-guard";
-import { demoSignIn } from "./demo-sign-in";
 import { consumeMagicLink } from "./magic-link-limit";
 import { sendMagicLinkEmail } from "./magic-link-email";
 
@@ -111,7 +110,6 @@ function createAuth() {
           await sendMagicLinkEmail({ email, url });
         },
       }),
-      demoSignIn(),
       // Sets cookies from Server Actions; Better Auth requires it last.
       nextCookies(),
     ],

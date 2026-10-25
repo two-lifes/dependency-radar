@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, type SQL, sql } from "drizzle-orm";
+import { eq, type SQL, sql } from "drizzle-orm";
 import type { Viewer } from "../analysis/project-access";
 import { isDemoUser } from "../demo/demo-user";
 import { projects } from "./schema";
@@ -11,24 +11,15 @@ const never = sql`false`;
 export function visibleProjects(viewer: Viewer): SQL {
   const owned = eq(projects.ownerId, viewer.userId);
   if (!isDemoUser(viewer.userId)) return owned;
-  return (
-    and(
-      owned,
-      or(
-        isNull(projects.demoSessionId),
-        eq(projects.demoSessionId, viewer.sessionId),
-      ),
-    ) ?? never
-  );
+  return never;
 }
 
 /**
- * `projectAccess(…) === "write"` as a WHERE condition. For the demo it is
- * `demo_session_id = <this session>`, never `IS NULL`, so no demo session can
- * change the seeded projects or another session's.
+ * `projectAccess(…) === "write"` as a WHERE condition. Old demo sessions
+ * cannot mutate either shared or session-owned projects.
  */
 export function editableProjects(viewer: Viewer): SQL {
   const owned = eq(projects.ownerId, viewer.userId);
   if (!isDemoUser(viewer.userId)) return owned;
-  return and(owned, eq(projects.demoSessionId, viewer.sessionId)) ?? never;
+  return never;
 }

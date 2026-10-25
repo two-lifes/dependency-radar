@@ -25,7 +25,7 @@ describe("canAccessReport", () => {
     expect(canAccessReport(projectReport, null)).toBe(false);
   });
 
-  it("follows the demo rule: seeded to all sessions, own to one", () => {
+  it("denies both shared and session-owned demo reports", () => {
     const seeded = {
       projectId: "p2",
       ownerId: DEMO_USER.id,
@@ -34,8 +34,8 @@ describe("canAccessReport", () => {
     const ofA = { ...seeded, demoSessionId: "s-a" };
     const demoA = { userId: DEMO_USER.id, sessionId: "s-a" };
     const demoB = { userId: DEMO_USER.id, sessionId: "s-b" };
-    expect(canAccessReport(seeded, demoB)).toBe(true);
-    expect(canAccessReport(ofA, demoA)).toBe(true);
+    expect(canAccessReport(seeded, demoB)).toBe(false);
+    expect(canAccessReport(ofA, demoA)).toBe(false);
     expect(canAccessReport(ofA, demoB)).toBe(false);
   });
 });

@@ -16,12 +16,10 @@ describe("visibleProjects", () => {
     expect(query.params).toEqual(["u1"]);
   });
 
-  it("adds the seeded projects and the session's own for the demo", () => {
+  it("denies all projects for old demo sessions", () => {
     const query = dialect.sqlToQuery(visibleProjects(demo));
-    expect(query.sql).toBe(
-      '("projects"."owner_id" = $1 and ("projects"."demo_session_id" is null or "projects"."demo_session_id" = $2))',
-    );
-    expect(query.params).toEqual(["demo", "s-a"]);
+    expect(query.sql).toBe("false");
+    expect(query.params).toEqual([]);
   });
 });
 
@@ -32,13 +30,10 @@ describe("editableProjects", () => {
     );
   });
 
-  // Delete, rename and replace run with this: a seeded project's null
-  // session or another session's id never equals the caller's own.
-  it("is only the session's own projects for the demo", () => {
+  // Delete, rename and replace all use this predicate.
+  it("denies all mutations for old demo sessions", () => {
     const query = dialect.sqlToQuery(editableProjects(demo));
-    expect(query.sql).toBe(
-      '("projects"."owner_id" = $1 and "projects"."demo_session_id" = $2)',
-    );
-    expect(query.params).toEqual(["demo", "s-a"]);
+    expect(query.sql).toBe("false");
+    expect(query.params).toEqual([]);
   });
 });

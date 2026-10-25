@@ -9,7 +9,6 @@ describe("isDemoAuthPathAllowed", () => {
     "/sign-in/social",
     "/magic-link/verify",
     "/callback/github",
-    undefined,
   ])("lets the demo call %s", (path) => {
     expect(isDemoAuthPathAllowed(path)).toBe(true);
   });
@@ -27,6 +26,7 @@ describe("isDemoAuthPathAllowed", () => {
     "/list-accounts",
     "/sign-in",
     "/some-future-endpoint",
+    undefined,
   ])("stops the demo calling %s", (path) => {
     expect(isDemoAuthPathAllowed(path)).toBe(false);
   });

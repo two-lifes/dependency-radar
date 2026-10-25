@@ -80,13 +80,12 @@ describe("POST /api/cron/daily", () => {
     expect(await response.json()).toEqual({
       guestReports: 3,
       apiCache: 42,
-      demo: "reset",
     });
     const now = cleanup.deleteExpiredGuestReports.mock.calls[0]?.[1];
     expect(now).toBeInstanceOf(Date);
     expect(cleanup.deleteExpiredGuestReports).toHaveBeenCalledWith(db, now);
     expect(cleanup.deleteExpiredApiCache).toHaveBeenCalledWith(db, now);
-    expect(demo.seedDemo).toHaveBeenCalledWith(db, now);
+    expect(demo.seedDemo).not.toHaveBeenCalled();
   });
 
   it("still runs the other steps when one fails and answers 500", async () => {
@@ -97,6 +96,6 @@ describe("POST /api/cron/daily", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ failed: ["guestReports"] });
     expect(cleanup.deleteExpiredApiCache).toHaveBeenCalled();
-    expect(demo.seedDemo).toHaveBeenCalled();
+    expect(demo.seedDemo).not.toHaveBeenCalled();
   });
 });

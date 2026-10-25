@@ -4,7 +4,6 @@ import {
   deleteExpiredApiCache,
   deleteExpiredGuestReports,
 } from "@/server/db/cleanup";
-import { seedDemo } from "@/server/db/demo";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +45,9 @@ export async function POST(request: Request) {
   const [guestReports, apiCache] = await Promise.all([
     step("guestReports", () => deleteExpiredGuestReports(db, now)),
     step("apiCache", () => deleteExpiredApiCache(db, now)),
-    step("demo", () => seedDemo(db, now)),
   ]);
   if (failed.length > 0) {
     return Response.json({ failed }, { status: 500 });
   }
-  return Response.json({ guestReports, apiCache, demo: "reset" });
+  return Response.json({ guestReports, apiCache });
 }

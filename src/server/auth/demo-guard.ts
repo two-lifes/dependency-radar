@@ -15,11 +15,10 @@ const DEMO_ALLOWED_PATHS = new Set([
 const DEMO_ALLOWED_PREFIXES = ["/sign-in/", "/callback/"];
 
 /**
- * `undefined` is a server-only endpoint (`signInDemo`): it has no path and
- * can't be reached over HTTP, only through `auth.api` from our own code.
+ * Unknown and server-only endpoints remain closed to old demo sessions.
  */
 export function isDemoAuthPathAllowed(path: string | undefined): boolean {
-  if (path === undefined) return true;
+  if (path === undefined) return false;
   return (
     DEMO_ALLOWED_PATHS.has(path) ||
     DEMO_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))
