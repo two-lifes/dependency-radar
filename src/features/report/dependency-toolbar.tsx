@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useHydrated } from "@/lib/use-hydrated";
 import {
   Sheet,
   SheetContent,
@@ -50,6 +51,7 @@ export function DependencyToolbar({
   total: number;
 }) {
   const { filters, setFilters, setQuery, clear } = state;
+  const hydrated = useHydrated();
   const { packageManager } = useReport();
   const updatable = updateTargets(shown).length;
   const searchRef = useFocusOnSlash();
@@ -73,6 +75,7 @@ export function DependencyToolbar({
           <Input
             ref={searchRef}
             type="search"
+            disabled={!hydrated}
             value={filters.q}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={copy.search}

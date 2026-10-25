@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { renderToString } from "react-dom/server";
 import { CheckForm } from "./check-form";
 import type { CheckFormAction, CheckFormState } from "./check-form-state";
 import { SAMPLE_PACKAGE_JSON } from "./sample-package-json";
@@ -12,6 +13,31 @@ const openTab = (name: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0 });
 
 describe("CheckForm", () => {
+  it("prevents native form submission and lost input before hydration", async () => {
+    const action = vi.fn<CheckFormAction>(async (state) => state);
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(<CheckForm action={action} />);
+    document.body.append(container);
+    expect(
+      screen.getByRole("textbox", { name: "package.json contents" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Check dependencies" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Upload file" })).toBeDisabled();
+    render(<CheckForm action={action} />, { container, hydrate: true });
+    const input = screen.getByRole("textbox", {
+      name: "package.json contents",
+    });
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: SAMPLE_PACKAGE_JSON } });
+    submit();
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0]?.[1].get("packageJson")).toBe(
+      SAMPLE_PACKAGE_JSON,
+    );
+  });
+
   it("keeps tab panels out of the Tab order", () => {
     render(<CheckForm action={vi.fn()} />);
 

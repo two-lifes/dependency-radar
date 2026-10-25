@@ -14,6 +14,7 @@ import { NetworkButton, NetworkError } from "../system/network-status";
 import { networkCopy } from "../system/network-copy";
 import { useNetworkAction } from "../system/use-network-action";
 import { isOnline } from "@/lib/use-online-status";
+import { useHydrated } from "@/lib/use-hydrated";
 
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +38,7 @@ const copy = landingCopy.form;
 
 /** screens 5.1, block 3: the main element of the landing. */
 export function CheckForm({ action }: { action: CheckFormAction }) {
+  const hydrated = useHydrated();
   const network = useNetworkAction(action);
   const [state, formAction, pending] = useActionState(
     network.action,
@@ -150,9 +152,15 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
         }}
       >
         <TabsList>
-          <TabsTrigger value="paste">{copy.tabs.paste}</TabsTrigger>
-          <TabsTrigger value="upload">{copy.tabs.upload}</TabsTrigger>
-          <TabsTrigger value="github">{copy.tabs.github}</TabsTrigger>
+          <TabsTrigger value="paste" disabled={!hydrated}>
+            {copy.tabs.paste}
+          </TabsTrigger>
+          <TabsTrigger value="upload" disabled={!hydrated}>
+            {copy.tabs.upload}
+          </TabsTrigger>
+          <TabsTrigger value="github" disabled={!hydrated}>
+            {copy.tabs.github}
+          </TabsTrigger>
         </TabsList>
 
         {/* Every panel holds a field, so the panel itself is no Tab stop
@@ -169,7 +177,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
               clearErrors();
             }}
             spellCheck={false}
-            disabled={pending}
+            disabled={!hydrated || pending}
             className="min-h-40 font-mono text-sm"
             {...fieldProps}
           />
@@ -186,7 +194,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
             browseRef={browseRef}
             invalid={Boolean(error)}
             describedBy={error ? errorId : undefined}
-            disabled={pending}
+            disabled={!hydrated || pending}
           />
         </TabsContent>
 
@@ -203,7 +211,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
               setUrl(event.target.value);
               clearErrors();
             }}
-            disabled={pending}
+            disabled={!hydrated || pending}
             {...fieldProps}
           />
           <p className="text-sm text-muted-foreground">{copy.githubHint}</p>
@@ -221,7 +229,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
           type="submit"
           variant="ghost"
           size="sm"
-          disabled={pending || quota.blocked || exhausted}
+          disabled={!hydrated || pending || quota.blocked || exhausted}
         >
           {networkCopy.retry}
         </NetworkButton>
@@ -235,7 +243,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
             type="submit"
             size="lg"
             className="w-full"
-            disabled={pending || quota.blocked}
+            disabled={!hydrated || pending || quota.blocked}
           >
             {pending ? (
               <>
@@ -252,7 +260,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
         )}
         <button
           type="button"
-          disabled={pending}
+          disabled={!hydrated || pending}
           onClick={() => {
             setSource("paste");
             setPasted(SAMPLE_PACKAGE_JSON);
