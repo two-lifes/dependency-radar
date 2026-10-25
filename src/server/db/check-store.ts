@@ -1,12 +1,14 @@
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { checkLaunchBlock } from "./check-cooldown";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { CheckStore } from "../check/check-store";
 import type { Db } from "./client";
 import { checkPackages, checks, reports } from "./schema";
+import { consumeGuestQuota, GuestQuotaExhausted } from "./guest-quota";
 
 const running = (checkId: string) =>
   and(eq(checks.id, checkId), eq(checks.status, "running"));
 
-export function createPgCheckStore(db: Db): CheckStore {
+export function createPgCheckStore(db: Db, guestId?: string): CheckStore {
   return {
     async getCheck(checkId) {
       const [check] = await db
@@ -92,6 +94,16 @@ export function createPgCheckStore(db: Db): CheckStore {
     async createCheck(reportId, input, origin) {
       try {
         return await db.transaction(async (tx) => {
+          // Serialize all new launches for this report, including a changed source.
+          const [locked] = await tx
+            .select({ id: reports.id })
+            .from(reports)
+            .where(eq(reports.id, reportId))
+            .for("update");
+          if (!locked) return { ok: false, error: "report-not-found" };
+          const blocked = await checkLaunchBlock(tx, reportId);
+          if (blocked) return { ok: false, ...blocked };
+          if (guestId) await consumeGuestQuota(tx, guestId);
           const [report] = input
             ? await tx
                 .update(reports)
@@ -110,16 +122,24 @@ export function createPgCheckStore(db: Db): CheckStore {
                 .from(reports)
                 .where(eq(reports.id, reportId))
                 .limit(1);
-          if (!report) return { ok: false, error: "report-not-found" };
+          if (!report) throw new Error("report-not-found");
 
           const [check] = await tx
             .insert(checks)
-            .values({ reportId, totalPackages: report.dependencies.length })
+            .values({
+              reportId,
+              totalPackages: report.dependencies.length,
+              startedAt: sql`clock_timestamp()`,
+            })
             .returning({ id: checks.id });
           if (!check) throw new Error("Insert into checks returned no row");
           return { ok: true, value: { checkId: check.id } };
         });
       } catch (error) {
+        if (error instanceof GuestQuotaExhausted)
+          return { ok: false, error: "guest-quota-exhausted" };
+        if (error instanceof Error && error.message === "report-not-found")
+          return { ok: false, error: "report-not-found" };
         // checks_one_running_per_report_idx: a check of this report runs;
         // the transaction rolls back the new input with it.
         if (isUniqueViolation(error)) {

@@ -3,7 +3,7 @@ import type { ReportInput } from "../analysis/report-input";
 import type { Result } from "../analysis/result";
 import type {
   CheckStore,
-  CreateCheckError,
+  CreateCheckResult,
   ReopenCheckError,
   ReportOrigin,
 } from "./check-store";
@@ -22,7 +22,7 @@ export function startCheck(
   reportId: string,
   input?: ReportInput,
   origin?: ReportOrigin,
-): Promise<Result<{ checkId: string }, CreateCheckError>> {
+): Promise<CreateCheckResult> {
   return store.createCheck(reportId, input, origin);
 }
 

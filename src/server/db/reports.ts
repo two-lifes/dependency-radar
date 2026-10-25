@@ -1,6 +1,7 @@
 import type { ReportInput } from "../analysis/report-input";
 import type { Db } from "./client";
 import { checks, reports } from "./schema";
+import { consumeGuestQuota } from "./guest-quota";
 
 // spec 9: guest reports are deleted after 7 days.
 const GUEST_REPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -19,8 +20,10 @@ export function createGuestReport(
   db: Db,
   { source, repoUrl, input }: NewGuestReport,
   now: Date = new Date(),
+  guestId?: string,
 ): Promise<{ reportId: string; checkId: string }> {
   return db.transaction(async (tx) => {
+    if (guestId) await consumeGuestQuota(tx, guestId);
     const [report] = await tx
       .insert(reports)
       .values({

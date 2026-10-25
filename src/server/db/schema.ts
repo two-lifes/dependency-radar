@@ -265,3 +265,12 @@ export const rateLimits = pgTable(
   },
   (t) => [primaryKey({ columns: [t.subject, t.windowStart] })],
 );
+
+export const guestQuotas = pgTable(
+  "guest_quotas",
+  {
+    id: uuid().primaryKey(),
+    used: integer().notNull().default(0),
+  },
+  (t) => [check("guest_quotas_used_check", sql`${t.used} between 0 and 3`)],
+);

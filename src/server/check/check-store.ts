@@ -38,7 +38,12 @@ export type CheckSnapshot = {
   finishedAt: Date;
 };
 
-export type CreateCheckError = "report-not-found" | "already-running";
+export type CreateCheckError =
+  "report-not-found" | "already-running" | "guest-quota-exhausted";
+
+export type CreateCheckResult =
+  | Result<{ checkId: string }, CreateCheckError>
+  | { ok: false; error: "check-cooldown"; nextCheckAt: string };
 
 export type ReopenCheckError =
   | "check-not-found"
@@ -73,7 +78,7 @@ export type CheckStore = {
     reportId: string,
     input?: ReportInput,
     origin?: ReportOrigin,
-  ): Promise<Result<{ checkId: string }, CreateCheckError>>;
+  ): Promise<CreateCheckResult>;
   /** Back to running, after deleting rows with `dropReasons`. */
   reopenCheck(
     checkId: string,
