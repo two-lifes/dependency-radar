@@ -444,6 +444,40 @@ describe("DependencyTable filters in the URL", () => {
     );
   });
 
+  it("does not take focus from the Filters sheet on / and restores the shortcut after Escape", async () => {
+    renderTable();
+    const search = screen.getByRole("searchbox", { name: "Search packages" });
+    const focus = vi.spyOn(search, "focus");
+    const trigger = screen.getByRole("button", { name: "Filters" });
+    fireEvent.click(trigger);
+    const sheet = await screen.findByRole("dialog", { name: "Filters" });
+    const close = within(sheet).getByRole("button", { name: "Close" });
+    close.focus();
+
+    expect(fireEvent.keyDown(close, { key: "/" })).toBe(true);
+    expect(focus).not.toHaveBeenCalled();
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(close, { key: "Escape" });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    fireEvent.keyDown(trigger, { key: "/" });
+    expect(search).toHaveFocus();
+  });
+
+  it("respects a / event already handled by another control", () => {
+    renderTable();
+    const search = screen.getByRole("searchbox", { name: "Search packages" });
+    const focus = vi.spyOn(search, "focus");
+    const event = new KeyboardEvent("keydown", {
+      key: "/",
+      bubbles: true,
+      cancelable: true,
+    });
+    event.preventDefault();
+    fireEvent(document.body, event);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
   it("says when every package is up to date", () => {
     const current = (name: string) =>
       result(name, { lagKind: "current", latest: "1.0.0", lagMajors: null });

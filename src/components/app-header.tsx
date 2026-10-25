@@ -90,7 +90,7 @@ export function AppHeader({ user }: { user: HeaderUser }) {
               <Avatar.Fallback>{initials(user)}</Avatar.Fallback>
             </Avatar.Root>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="min-w-56">
+          <DropdownMenuContent className="w-64">
             <DropdownMenuLabel className="grid gap-0.5 text-sm">
               <span className="truncate font-medium text-foreground">
                 {user.name || user.email}

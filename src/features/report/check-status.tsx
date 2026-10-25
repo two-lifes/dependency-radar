@@ -164,7 +164,7 @@ function Banner({
     >
       {icon}
       <span className="flex-1">{text}</span>
-      <div className="flex gap-2">{children}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
 }

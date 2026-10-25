@@ -113,7 +113,9 @@ describe("CheckForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Add a package.json file.",
     );
-    expect(screen.getByRole("button", { name: "browse" })).toHaveFocus();
+    const browse = screen.getByRole("button", { name: "browse" });
+    expect(browse).toHaveFocus();
+    expect(browse).toHaveAccessibleDescription("Add a package.json file.");
     expect(action).not.toHaveBeenCalled();
   });
 

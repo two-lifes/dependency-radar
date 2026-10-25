@@ -69,7 +69,7 @@ export function Toaster() {
           }}
           className="flex animate-pop-in items-center gap-3 rounded-lg border border-border bg-popover py-3 pr-2 pl-4 text-popover-foreground shadow-overlay"
         >
-          <div className="grid flex-1 gap-0.5">
+          <div className="grid min-w-0 flex-1 gap-0.5 wrap-anywhere">
             <ToastPrimitive.Title className="text-base font-medium">
               {item.title}
             </ToastPrimitive.Title>

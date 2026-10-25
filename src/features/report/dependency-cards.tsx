@@ -83,7 +83,7 @@ export function DependencyCards({
           aria-busy={row.result === null || undefined}
           className={cn(
             // style guide 5: the open package gets a 2px brand bar on the left.
-            "grid cursor-pointer gap-1.5 border-l-2 py-4 pr-4 pl-3.5 focus-visible:-outline-offset-2",
+            "grid min-w-0 cursor-pointer gap-1.5 border-l-2 py-4 pr-4 pl-3.5 focus-visible:-outline-offset-2",
             opener.open === row.name
               ? "border-l-brand"
               : "border-l-transparent",
@@ -140,12 +140,15 @@ function Card({ row, selection }: { row: ReportRow; selection: Selection }) {
         {pending ? (
           <Skeleton className="h-3 w-28" />
         ) : result.checked && result.current !== null ? (
-          <p className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground">
-            {result.current}
+          <p className="flex flex-wrap items-center gap-1.5 font-mono text-sm wrap-anywhere text-muted-foreground">
+            <span className="min-w-0">{result.current}</span>
             {result.latest !== null && result.latest !== result.current ? (
               <>
-                <ArrowRight aria-label={copy.to} className="size-3.5" />
-                <span className="text-foreground">{result.latest}</span>
+                <ArrowRight
+                  aria-label={copy.to}
+                  className="size-3.5 shrink-0"
+                />
+                <span className="min-w-0 text-foreground">{result.latest}</span>
               </>
             ) : null}
           </p>
@@ -156,7 +159,7 @@ function Card({ row, selection }: { row: ReportRow; selection: Selection }) {
           </p>
         )}
       </div>
-      <div className="flex items-center gap-3 pl-7">
+      <div className="flex flex-wrap items-center gap-3 pl-7">
         {pending ? (
           <Skeleton className="h-3 w-20" />
         ) : (

@@ -308,14 +308,23 @@ function useFocusOnSlash() {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) {
+      if (
+        event.defaultPrevented ||
+        event.key !== "/" ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
         return;
       }
       const target = event.target;
       if (
         target instanceof HTMLElement &&
         (target.isContentEditable ||
-          target.closest("input, textarea, select") !== null)
+          // Portalled dialogs and menus must keep their keyboard focus.
+          target.closest(
+            'input, textarea, select, [role="dialog"], [role="menu"]',
+          ) !== null)
       ) {
         return;
       }

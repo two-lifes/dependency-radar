@@ -26,6 +26,26 @@ import {
 } from "./tooltip";
 
 describe("Dialog", () => {
+  it("wraps Tab and Shift+Tab inside the modal", async () => {
+    render(
+      <Dialog defaultOpen>
+        <DialogTrigger>Open</DialogTrigger>
+        <DialogContent aria-describedby={undefined}>
+          <DialogTitle>Confirm changes</DialogTitle>
+          <button type="button">Confirm</button>
+        </DialogContent>
+      </Dialog>,
+    );
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    const close = screen.getByRole("button", { name: "Close" });
+    await waitFor(() => expect(confirm).toHaveFocus());
+
+    fireEvent.keyDown(confirm, { key: "Tab", shiftKey: true });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "Tab" });
+    expect(confirm).toHaveFocus();
+  });
+
   it("is a labelled modal that closes on Escape and returns focus", async () => {
     render(
       <Dialog>

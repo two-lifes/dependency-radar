@@ -129,10 +129,10 @@ export function ReportHeader({
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 rounded-sm hover:text-foreground"
+                className="inline-flex min-w-0 items-center gap-0.5 rounded-sm wrap-anywhere hover:text-foreground"
               >
                 {source.url.replace(/^https:\/\//, "")}
-                <ArrowUpRight className="size-3.5" aria-hidden />
+                <ArrowUpRight className="size-3.5 shrink-0" aria-hidden />
               </a>
             ) : (
               <span>{copy.source[source.kind]}</span>

@@ -17,7 +17,7 @@ export function SettingsSection({
   return (
     <section
       className={cn(
-        "grid gap-4 rounded-xl border bg-card p-4 sm:p-6",
+        "grid min-w-0 grid-cols-1 gap-4 rounded-xl border bg-card p-4 wrap-anywhere sm:p-6",
         danger ? "border-danger/50" : "border-border",
       )}
     >

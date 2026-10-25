@@ -389,7 +389,7 @@ function Versions({
   }
   return (
     <section className="grid gap-3">
-      <p className="text-sm">
+      <p className="text-sm wrap-anywhere">
         <span className="text-muted-foreground">{copy.current} </span>
         <span className="font-mono">{result.current}</span>
         <span aria-hidden="true" className="text-muted-foreground">
@@ -492,10 +492,10 @@ function VulnerabilityItem({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={vulnerabilitiesCopy.sourceLabel(id)}
-            className="inline-flex items-center gap-1 rounded-sm font-mono text-xs text-brand-text underline-offset-4 hover:underline"
+            className="inline-flex min-w-0 items-center gap-1 rounded-sm font-mono text-xs wrap-anywhere text-brand-text underline-offset-4 hover:underline"
           >
             {id}
-            <ExternalLink aria-hidden className="size-3" />
+            <ExternalLink aria-hidden className="size-3 shrink-0" />
           </a>
         ))}
       </div>
@@ -512,7 +512,7 @@ function VulnerabilityItem({
       ) : null}
       <p
         className={cn(
-          "text-sm",
+          "text-sm wrap-anywhere",
           fixedIn === null ? "text-muted-foreground" : "text-foreground",
         )}
       >
