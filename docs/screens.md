@@ -2,7 +2,9 @@
 
 Цвета на вайрфреймах не финальные, цвета — только из style-guide.
 
-Версия 2.2 · 22.10.2026 · дополняет `docs/spec.md` v1.3.
+Версия 2.3 · 25.10.2026 · дополняет `docs/spec.md` v1.4.
+
+> Гостевая квота и закрытие демо — целевое поведение ещё не выполненной задачи 26.2 ([решение 53](decisions.md#decision-53)).
 
 Этот документ — единственный источник правды о том, **какие экраны есть, по каким адресам они открываются, что на них расположено, куда ведёт каждое действие и как экран выглядит в каждом состоянии**. Визуально то же самое показано в `sitemap.excalidraw` (навигация) и `wireframes.excalidraw` (раскладка экранов). Если картинка и этот текст расходятся, прав текст.
 
@@ -28,7 +30,7 @@
 | `/` | Лендинг + быстрая проверка | все (вошедший тоже видит лендинг, в шапке «Dashboard») | MVP |
 | `/login?next=` | Вход | только гости (вошедшего перенаправляет на `next` или `/projects`) | MVP |
 | `/login/check-email?email=` | «Проверьте почту» | гости | MVP |
-| `/demo` | Без интерфейса: вход в демо-аккаунт и переход на `/projects` | все | MVP |
+| `/demo` | 404; прежний вход в демо закрыт | все | MVP, задача 26.2 |
 | `/r/[reportId]` | Редирект на `/r/[reportId]/dependencies` | все, по ссылке | MVP |
 | `/r/[reportId]/dependencies` | Гостевой отчёт, вкладка «Dependencies» | все | MVP |
 | `/r/[reportId]/vulnerabilities` | Гостевой отчёт, вкладка «Vulnerabilities» | все | MVP |
@@ -64,7 +66,6 @@ flowchart LR
   Landing["/ Лендинг"]:::mvp
   Login["/login"]:::mvp
   CheckEmail["/login/check-email"]:::mvp
-  Demo(["/demo"]):::sys
   GuestReport["/r/:id/* Гостевой отчёт"]:::mvp
   Save(["/r/:id/save"]):::sys
   Projects["/projects Дашборд"]:::mvp
@@ -82,10 +83,11 @@ flowchart LR
   Invite["/invite/:token"]:::v12
 
   Landing -- "Check dependencies" --> GuestReport
-  Landing -- "Try demo" --> Demo --> Projects
+  Landing -- "Квота исчерпана: GitHub OAuth" --> Landing
+  GuestReport -- "Квота исчерпана: GitHub OAuth" --> GuestReport
   Landing -- "Sign in" --> Login
   Login -- "Email link" --> CheckEmail
-  Login -- "GitHub / ссылка из письма" --> Projects
+  Login -- "GitHub / ссылка из письма, без next" --> Projects
   GuestReport -- "Save project (гость)" --> Login
   Login -- "next=/r/:id/save" --> Save
   GuestReport -- "Save project (вошёл)" --> Save
@@ -111,15 +113,21 @@ flowchart LR
 ## 4. Каркас приложения (общие элементы)
 
 ### 4.1. Шапка гостя (лендинг, вход, гостевой отчёт)
-Слева логотип «Dependency Radar» → `/`. Справа «Try demo» (вторичная кнопка) и «Sign in» (основная). На ширине < 640px «Try demo» уходит в меню.
+Слева логотип «Dependency Radar» → `/`. Справа «Sign in» → `/login`. При входе из гостевого отчёта или после исчерпания квоты передавать безопасный `next` с текущим путём и query. Ссылок на демо нет ни на desktop, ни в мобильном меню.
 
 ### 4.2. Шапка приложения (все страницы после входа)
 - Слева логотип → `/projects`.
 - Справа: **[1.2]** колокольчик со счётчиком непрочитанных (на desktop открывает панель уведомлений, на мобильных ведёт на `/notifications`); аватар с меню: «Settings» → `/settings/profile`, «Theme» (Light / Dark / System), «Sign out» → `/`.
 - Других пунктов навигации нет: в продукте одна основная зона — проекты.
 
-### 4.3. Плашка демо-режима
-Под шапкой на всех страницах демо-аккаунта: «You're exploring a demo. Data resets daily.» + кнопка «Create free account» → `/login`. Плашку можно закрыть до конца сессии.
+<a id="guest-quota-ui"></a>
+
+### 4.3. Остаток гостевой квоты (задача 26.2)
+На лендинге рядом с кнопкой запуска и в шапке гостевого отчёта показывать серверный остаток: «3 guest checks remaining», «2 guest checks remaining», «1 guest check remaining». После успешного создания проверки обновлять остаток; сервер повторно проверяет его при каждом новом запуске, в том числе при устаревшем UI в другой вкладке.
+
+При нуле: «You've used all 3 guest checks in this browser.» и «Continue with GitHub» вместо «Check dependencies» / «Check again». CTA начинает GitHub OAuth с возвратом на исходный локальный путь с query-параметрами; возврат не запускает проверку и не сохраняет отчёт. Ошибку/отмену OAuth обрабатывать как в 5.2, сохраняя адрес возврата. Для email остаётся обычный «Sign in» через `/login` с тем же `next`.
+
+Просмотр результатов, «Save project», «Copy link», «Resume», «Retry failed» и «Try again» существующей проверки доступны при нуле; часовые ограничения по-прежнему могут запретить продолжение. Для ошибки часового лимита использовать отдельное сообщение из 5.1 с временем ожидания. После входа гостевой счётчик и CTA квоты скрываются: действует лимит аккаунта. После выхода отображается прежний гостевой остаток. Демо-плашки нет.
 
 ### 4.4. Тосты
 Правый нижний угол (на мобильных — снизу по центру). Скрываются через 5 с, с действием «Undo» — через 8 с. Используются для подтверждений: «Project saved», «Link copied», «Package snoozed — Undo».
@@ -148,19 +156,19 @@ flowchart LR
    - Paste: многострочное поле с плейсхолдером `{ "dependencies": { ... } }`;
    - Upload: зона перетаскивания «Drop package.json (and optionally package-lock.json) here or browse»;
    - GitHub URL: поле `https://github.com/owner/repo`, подсказка «Public repositories only»;
-   - кнопка «Check dependencies» (основная);
-   - ссылка под кнопкой «or try a sample project» — заполняет поле примером.
+   - остаток гостевой квоты и кнопка «Check dependencies» (основная), при нуле — состояние из 4.3;
+   - ссылка под кнопкой «or try a sample project» — заполняет поле примером бесплатно; его запуск расходует одну попытку, как любой другой источник.
 4. Полоса доверия: «Data from npm registry, OSV.dev and GitHub».
 5. «How it works»: три шага в ряд (на мобильных — столбиком): «Paste or upload» → «We check every package» → «Get your upgrade plan».
-6. Пример отчёта: скриншот отчёта и кнопка «Open live demo» → `/demo`.
+6. Пример отчёта: статичный скриншот без кнопки «Open live demo» и без перехода в демо.
 7. Подвал (4.6).
 
 **Действия:**
 | Действие | Результат |
 |---|---|
-| «Check dependencies» с корректными данными | создаётся гостевой отчёт → `/r/[id]/dependencies`, проверка стартует сразу |
+| «Check dependencies» с корректными данными и доступным лимитом | создаются гостевой отчёт и проверка, списывается одна гостевая попытка → `/r/[id]/dependencies`; для вошедшего действует лимит аккаунта |
 | «Check dependencies» с ошибкой | ошибка под полем, перехода нет |
-| «Try demo» / «Open live demo» | `/demo` → `/projects` |
+| «Continue with GitHub» при нулевой квоте | GitHub OAuth → исходная страница с query; автоматического запуска нет |
 | «Sign in» | `/login` |
 
 **Состояния:** во время отправки на кнопке спиннер и текст «Starting…», кнопка неактивна. Ошибки показываются под полем, поле подсвечено, фокус переходит на поле:
@@ -179,7 +187,7 @@ flowchart LR
 
 ### 5.2. Вход `/login` [MVP]
 
-**Раскладка:** по центру карточка шириной до 400px: заголовок «Sign in to Dependency Radar», кнопка «Continue with GitHub», разделитель «or», поле email + кнопка «Send sign-in link», мелкий текст «No passwords. We'll email you a magic link.». Если пришли от гостевого отчёта (есть `next`), над формой: «Sign in to save your report.»
+**Раскладка:** по центру карточка шириной до 400px: заголовок «Sign in to Dependency Radar», кнопка «Continue with GitHub», разделитель «or», поле email + кнопка «Send sign-in link», мелкий текст «No passwords. We'll email you a magic link.». Только если `next` ведёт на `/r/[id]/save`, над формой: «Sign in to save your report.» Возврат на обычную страницу отчёта или лендинг не означает сохранение и не показывает этот текст. Email-вход сохраняется, в том числе после исчерпания гостевой квоты.
 
 **Действия:** GitHub → OAuth → `next` или `/projects`. Email → `/login/check-email?email=…`.
 
@@ -201,7 +209,7 @@ flowchart LR
    - справа действия:
      - гость: «Save project» (основная), «Copy link», «Check again»;
      - проект: «Check again» (основная), «Copy link», иконка «Settings» → `/projects/[id]/settings`;
-   - у гостя дополнительная строка: «This report is public via link and expires on 25 Oct.»
+   - у гостя дополнительная строка: «This report is public via link and expires on 25 Oct.»; рядом с действиями — остаток или CTA квоты из 4.3. Нулевая квота не закрывает готовый отчёт до его истечения.
 3. **Полоса прогресса** (только во время проверки): «Checking dependencies… 34 of 112» + тонкий прогресс-бар + «Cancel». После завершения исчезает, сводка обновляется.
 4. **Сводка:** слева круг оценки здоровья (число 0–100, цвет по ТЗ 7.1, подпись «Health score», иконка «?» с поповером «How it's calculated»); справа 5 плиток-счётчиков: «Up to date», «Patch behind», «Minor behind», «Major behind», «Vulnerable» (под числом разбивка critical/high). **Клик по плитке применяет соответствующий фильтр** к таблице.
 5. **Вкладки:** «Dependencies (112)» | «Vulnerabilities (7)» | [1.1] «Upgrade plan» | [1.1] «History». У гостя только первые две. Вкладки — ссылки на свои адреса; фильтры при переключении вкладок сохраняются.
@@ -227,8 +235,9 @@ flowchart LR
 | «Save project», гость не вошёл | `/login?next=/r/[id]/save` |
 | «Save project», вошёл | `/r/[id]/save` → создаётся проект из отчёта → `/projects/[newId]/dependencies`, тост «Project saved» |
 | «Copy link» | копирует текущий URL с фильтрами, тост «Link copied» |
-| «Check again» | новая проверка на этой же странице; пока идёт проверка, кнопка неактивна. Если источник — GitHub, сначала заново читаются `package.json` и lock-файл (кнопка неактивна, спиннер и «Fetching repository…»); пакеты, удалённые из `package.json`, исчезают из таблицы, новые появляются скелетон-строками. Если репозиторий прочитать не удалось, проверка не начинается, данные остаются, тост-ошибка с текстом из 5.1 («Repository not found or private.», «No package.json in the repository root.», «GitHub is rate-limiting us. Try again in N minutes.» и т. д.). «Resume» и «Retry failed» репозиторий не перечитывают |
-| «Cancel» | останавливает проверку → состояние «Check cancelled» |
+| «Check again» | новая проверка на этой же странице за одну гостевую попытку при успешном создании (вошедшему — лимит аккаунта); ошибки подготовки и отказ «already running» гостевую попытку не расходуют; пока идёт проверка, кнопка неактивна. Если источник — GitHub, сначала заново читаются `package.json` и lock-файл (кнопка неактивна, спиннер и «Fetching repository…»); пакеты, удалённые из `package.json`, исчезают из таблицы, новые появляются скелетон-строками. Если репозиторий прочитать не удалось, проверка не начинается, данные остаются, тост-ошибка с текстом из 5.1 («Repository not found or private.», «No package.json in the repository root.», «GitHub is rate-limiting us. Try again in N minutes.» и т. д.). «Resume» и «Retry failed» репозиторий не перечитывают |
+| «Cancel» | останавливает проверку → состояние «Check cancelled»; гостевая попытка не возвращается |
+| «Resume» / «Retry failed» / «Try again» существующей проверки | продолжение без списания гостевой квоты; отдельный часовой лимит сохраняется |
 | Плитка сводки | фильтр в таблице, переход на вкладку Dependencies |
 
 ---
@@ -321,7 +330,7 @@ N — выделенные пакеты, которые попадут в ком
 ### 5.10. Дашборд `/projects` [MVP — простой, 1.1 — полный]
 
 **Раскладка:**
-1. Заголовок «Projects», справа «Import from GitHub» (вторичная, только если GitHub подключён и это не демо; → `/projects/new?source=github`) и «New project» (основная). Пока проектов нет, кнопок в шапке нет: действия только в пустом состоянии, чтобы на экране было одно основное действие.
+1. Заголовок «Projects», справа «Import from GitHub» (вторичная, только если GitHub подключён; → `/projects/new?source=github`) и «New project» (основная). Пока проектов нет, кнопок в шапке нет: действия только в пустом состоянии, чтобы на экране было одно основное действие.
 2. [1.2] Переключатель «Mine | Team».
 3. [1.1] Поиск и сортировка «Sort: Health / Name / Last checked».
 4. Сетка карточек (3 в ряд на desktop, 2 на планшете, 1 на мобильных). Вся карточка — ссылка на `/projects/[id]/dependencies`:
@@ -336,7 +345,7 @@ N — выделенные пакеты, которые попадут в ком
 5. [1.1] Блок «Across projects»: пакеты, устаревшие в двух и более проектах, например «typescript — behind in 3 projects».
 
 **Состояния:**
-- пусто (первый вход): иконка, «No projects yet», «Add a project to track its dependencies over time.», кнопки «Import from GitHub» (основная, если GitHub подключён; → `/projects/new?source=github`) и «New project»; если GitHub не подключён — «New project» и ссылка «Connect GitHub to see your repositories» → `/settings/profile`; в демо — только «New project»;
+- пусто (первый вход): иконка, «No projects yet», «Add a project to track its dependencies over time.», кнопки «Import from GitHub» (основная, если GitHub подключён; → `/projects/new?source=github`) и «New project»; если GitHub не подключён — «New project» и ссылка «Connect GitHub to see your repositories» → `/settings/profile`;
 - загрузка: 6 скелетон-карточек;
 - ошибка: «Couldn't load projects. Retry».
 
@@ -369,7 +378,6 @@ N — выделенные пакеты, которые попадут в ком
 - нет репозиториев: «No public repositories on @login.»;
 - поиск без совпадений: «No repositories match "q".»;
 - GitHub не подключён: вместо списка ссылка «Connect GitHub to see your repositories» → `/settings/profile`;
-- демо: списка нет.
 
 Ошибка списка не мешает форме: URL можно ввести вручную.
 
@@ -384,8 +392,6 @@ N — выделенные пакеты, которые попадут в ком
 4. [1.1] «Ignored packages»: список с причинами и «Remove».
 5. «Danger zone» (красная рамка): «Delete project» → диалог подтверждения с вводом имени проекта (тот же, что в меню карточки) → `/projects`, тост «Project deleted».
 
-**Демо:** у общих проектов демо имя, «Replace source» и «Delete project» неактивны с подсказкой «Not available in the demo.». Проект, созданный в демо, виден только создавшей его сессии, и его настройки работают как обычно; для других сессий он — 404.
-
 **Состояния:** загрузка — скелетон трёх секций; ошибка — «Couldn't load project settings. Retry»; чужой проект — 404.
 
 ### 5.13. Настройки аккаунта `/settings/*`
@@ -393,7 +399,7 @@ N — выделенные пакеты, которые попадут в ком
 Слева вертикальное меню разделов (на мобильных — вкладки сверху): «Profile» [MVP], «Notifications» [1.2], «Team» [1.2].
 
 - **Profile [MVP]:** секции карточками:
-  - «Account»: «Name» (до 60 символов, может быть пустым — тогда в шапке email) с «Save», тост «Name saved»; «Email» только для чтения. В демо «Name» и «Save» неактивны с подсказкой «Not available in the demo.»;
+  - «Account»: «Name» (до 60 символов, может быть пустым — тогда в шапке email) с «Save», тост «Name saved»; «Email» только для чтения;
   - «GitHub»: «Connected as @user» (логин не прочитался — «Connected to GitHub») или подсказка «Connect GitHub to import your repositories.» и кнопка «Connect GitHub» (возврат на эту же страницу). Сбой или аккаунт GitHub уже привязан к другому пользователю — «Couldn't connect GitHub. It may already be connected to another account.»;
   - «Theme»: Light / Dark / System, применяется сразу, без «Save»;
   - «Danger zone»: «Delete account» → диалог «Delete account?» с вводом email (регистр не важен) → лендинг, тост «Account deleted». Если вход был больше суток назад — «For security, sign in again to delete your account.» и кнопка «Sign in again» (выход и `/login?next=/settings/profile`).
@@ -424,9 +430,9 @@ N — выделенные пакеты, которые попадут в ком
 - **Брейкпоинты:** < 640px мобильный, 640–1023px планшет, ≥ 1024px desktop. Максимальная ширина контента 1280px.
 - **Тема:** светлая и тёмная, по умолчанию системная.
 
-## 7. Демо-данные (сид)
+## 7. Исторические демо-данные (ручной сид)
 
-В демо-аккаунте 4 проекта, чтобы показать все состояния:
+История задач 25–26.1, не действующий пользовательский сценарий после 26.2. Четыре проекта остаются данными вспомогательного `pnpm db:seed`; автоматический сид из `/demo` и cron отключается. Старые данные не удаляются, доступ по старым демо-сессиям закрывается, в том числе к отчётам и SSE. Плашки и настройки демо не реализовывать заново. Состав исторического сида:
 | Проект | Состояние |
 |---|---|
 | «shop-frontend» (Next.js) | оценка около 45, 2 critical уязвимости, мажорное отставание React/Next: «плохой» отчёт и насыщенный план |
@@ -434,4 +440,4 @@ N — выделенные пакеты, которые попадут в ком
 | «marketing-site» (Astro) | оценка около 98: почти всё актуально |
 | «legacy-widget» | deprecated-пакеты и 5 пакетов, которые не удалось проверить (частичный результат) |
 
-Для 1.1: у каждого проекта 8–12 проверок в истории за последние 3 месяца с реалистичной динамикой.
+Историческая идея для 1.1: у каждого проекта 8–12 проверок в истории за последние 3 месяца с реалистичной динамикой; не требование задачи 26.2.
