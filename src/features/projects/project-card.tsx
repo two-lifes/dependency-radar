@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { NetworkError } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { useOnlineStatus } from "@/lib/use-online-status";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,13 +51,16 @@ export function ProjectCard({
   onCheckNow,
   onDelete,
   nextCheckAt,
+  failure,
 }: {
   project: DashboardProject;
   nextCheckAt?: string;
+  failure?: string;
   status: DisplayStatus;
   onCheckNow: () => void;
   onDelete: () => void;
 }) {
+  const online = useOnlineStatus();
   const { result } = project;
   const cooldown = useCheckCooldown(
     nextCheckAt && (!project.nextCheckAt || nextCheckAt > project.nextCheckAt)
@@ -103,8 +109,13 @@ export function ProjectCard({
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               disabled={
-                checking || status.kind === "queued" || cooldown.seconds > 0
+                !online ||
+                checking ||
+                status.kind === "queued" ||
+                cooldown.seconds > 0
               }
+              title={!online ? networkCopy.required : undefined}
+              aria-description={!online ? networkCopy.required : undefined}
               onSelect={onCheckNow}
             >
               <RefreshCw aria-hidden />
@@ -140,6 +151,15 @@ export function ProjectCard({
         </DropdownMenu>
       </div>
 
+      <div className="relative z-10">
+        <NetworkError
+          message={failure}
+          onRetry={onCheckNow}
+          disabled={
+            checking || status.kind === "queued" || cooldown.seconds > 0
+          }
+        />
+      </div>
       {/* W4 wireframe: the score, and beside it the findings and the date. */}
       <div className="flex items-center gap-4">
         <p className="grid min-w-12">

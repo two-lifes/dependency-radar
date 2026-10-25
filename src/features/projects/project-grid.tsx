@@ -13,7 +13,7 @@ import { useCheckQueue } from "./use-check-queue";
 
 /** screens 5.10: the cards and the dashboard's check queue. */
 export function ProjectGrid({ projects }: { projects: DashboardProject[] }) {
-  const { queue, cooldowns, checkNow, forget } = useCheckQueue(
+  const { queue, cooldowns, failures, checkNow, forget } = useCheckQueue(
     projects.filter(needsFirstCheck).map((project) => project.id),
   );
   const [deleting, setDeleting] = useState<DashboardProject | null>(null);
@@ -24,6 +24,7 @@ export function ProjectGrid({ projects }: { projects: DashboardProject[] }) {
         {projects.map((project) => (
           <li key={project.id} className="grid">
             <ProjectCard
+              failure={failures[project.id]}
               nextCheckAt={cooldowns[project.id]}
               project={project}
               status={displayStatus(

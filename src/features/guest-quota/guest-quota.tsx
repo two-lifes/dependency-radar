@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Button } from "@/components/ui/button";
+import { NetworkButton as Button } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { isOnline } from "@/lib/use-online-status";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { GuestQuotaState } from "@/server/guest-quota";
 import { safeNext } from "@/lib/safe-next";
@@ -47,13 +49,15 @@ export function GuestQuotaProvider({
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
   const refresh = async () => {
+    if (!isOnline()) return;
     const request = ++generation.current;
     setLoading(true);
     try {
       const next = await refreshGuestQuota();
       if (request === generation.current) setState(next);
     } catch {
-      if (request === generation.current) setState({ kind: "error" });
+      if (request === generation.current && isOnline())
+        setState({ kind: "error" });
     } finally {
       if (request === generation.current) setLoading(false);
     }
@@ -63,9 +67,11 @@ export function GuestQuotaProvider({
       if (document.visibilityState === "visible") void refresh();
     };
     window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
   }, []);
@@ -129,6 +135,7 @@ export function GuestGithubButton() {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const signIn = async () => {
+    if (!isOnline() || pending) return;
     const next = safeNext(window.location.pathname + window.location.search);
     setPending(true);
     setFailed(false);
@@ -152,6 +159,15 @@ export function GuestGithubButton() {
       <Button type="button" disabled={pending} onClick={() => void signIn()}>
         {copy.github}
       </Button>
+      {failed ? (
+        <Button
+          variant="secondary"
+          disabled={pending}
+          onClick={() => void signIn()}
+        >
+          {networkCopy.retry}
+        </Button>
+      ) : null}
       {failed ? (
         <p role="alert" className="text-sm text-danger">
           {authCopy.errors.github}

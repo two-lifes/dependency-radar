@@ -3,8 +3,9 @@
 import { AlertTriangle, CircleSlash, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type ReactNode, useTransition } from "react";
+import { type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
 import { cancel, type ReportActionResult, resume, retry } from "./actions";
 import { reportCopy } from "./copy";
 import { serializeFilters } from "./filters";
@@ -16,7 +17,7 @@ const copy = reportCopy;
 /** Progress bar while a check runs (screens 5.4, style guide §5). */
 export function CheckProgress() {
   const { checkId, running, stream, closeStream, retryStream } = useReport();
-  const [pending, startTransition] = useTransition();
+  const [pending, runCancel, cancelFailure] = useReportAction();
   if (!running || !checkId) return null;
 
   if (stream.connection === "lost") {
@@ -27,9 +28,9 @@ export function CheckProgress() {
       >
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         <span className="flex-1">{copy.progress.lost}</span>
-        <Button variant="secondary" size="sm" onClick={retryStream}>
+        <NetworkButton variant="secondary" size="sm" onClick={retryStream}>
           {copy.progress.retry}
-        </Button>
+        </NetworkButton>
       </div>
     );
   }
@@ -45,23 +46,28 @@ export function CheckProgress() {
         >
           {copy.progress.label(checked, total)}
         </span>
-        <Button
+        <NetworkButton
           variant="secondary"
           size="sm"
           disabled={pending}
           onClick={() =>
-            startTransition(async () => {
+            runCancel(async () => {
               // Closing stops the check when this tab runs it; the action
               // covers a check another tab or stream runs.
               closeStream();
-              await cancel(checkId);
+              return await cancel(checkId);
             })
           }
         >
           {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
           {copy.progress.cancel}
-        </Button>
+        </NetworkButton>
       </div>
+      <NetworkError
+        message={cancelFailure}
+        disabled={pending}
+        onRetry={() => runCancel(() => cancel(checkId))}
+      />
       <div
         role="progressbar"
         aria-labelledby="check-progress-label"
@@ -92,21 +98,26 @@ export function CheckBanner({
   basePath: string;
 }) {
   const search = useSearchParams();
-  const [pending, runAction] = useReportAction();
+  const [pending, runAction, failure] = useReportAction();
   const run = (action: (id: string) => Promise<ReportActionResult>) =>
     runAction(() => action(checkId));
 
   if (status === "cancelled") {
     return (
       <Banner icon={<CircleSlash />} text={copy.banner.cancelled}>
-        <Button
+        <NetworkButton
           variant="secondary"
           size="sm"
           disabled={pending}
           onClick={() => run(resume)}
         >
           {copy.banner.resume}
-        </Button>
+        </NetworkButton>
+        <NetworkError
+          message={failure}
+          disabled={pending}
+          onRetry={() => run(resume)}
+        />
       </Banner>
     );
   }
@@ -120,14 +131,19 @@ export function CheckBanner({
           {copy.banner.show}
         </Link>
       </Button>
-      <Button
+      <NetworkButton
         variant="secondary"
         size="sm"
         disabled={pending}
         onClick={() => run(retry)}
       >
         {copy.banner.retryFailed}
-      </Button>
+      </NetworkButton>
+      <NetworkError
+        message={failure}
+        disabled={pending}
+        onRetry={() => run(retry)}
+      />
     </Banner>
   );
 }
@@ -161,7 +177,7 @@ export function CheckFailed({
   reason: string;
   onTryAgain: () => Promise<ReportActionResult>;
 }) {
-  const [pending, run] = useReportAction();
+  const [pending, run, failure] = useReportAction();
   return (
     <section
       role="alert"
@@ -176,10 +192,15 @@ export function CheckFailed({
         {copy.failed.title}
       </h2>
       <p className="text-base text-muted-foreground">{reason}</p>
-      <Button disabled={pending} onClick={() => run(onTryAgain)}>
+      <NetworkError
+        message={failure}
+        disabled={pending}
+        onRetry={() => run(onTryAgain)}
+      />
+      <NetworkButton disabled={pending} onClick={() => run(onTryAgain)}>
         {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
         {copy.failed.tryAgain}
-      </Button>
+      </NetworkButton>
     </section>
   );
 }

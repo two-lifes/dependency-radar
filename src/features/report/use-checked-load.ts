@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isOnline, useOnlineStatus } from "@/lib/use-online-status";
 import type { Result } from "@/server/analysis/result";
 import type { PackageDetailsError } from "./package-actions";
 import type { ReportRow } from "./report-rows";
 
 export type LoadState<T> =
   | { status: "idle" }
+  | { status: "offline" }
   | { status: "loading" }
   | { status: "error"; retry: () => void }
   | { status: "done"; value: T };
@@ -24,9 +26,12 @@ export function useCheckedLoad<T>(
   reportId: string,
   row: ReportRow,
 ): LoadState<T> {
+  const online = useOnlineStatus();
   const { name, result } = row;
   const key = result?.checked
-    ? [result.registryName, result.current, result.latest].join("|")
+    ? [reportId, name, result.registryName, result.current, result.latest].join(
+        "|",
+      )
     : null;
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{
@@ -36,7 +41,12 @@ export function useCheckedLoad<T>(
   } | null>(null);
 
   useEffect(() => {
-    if (key === null) return;
+    if (
+      key === null ||
+      !online ||
+      (loaded?.key === key && loaded.attempt === attempt)
+    )
+      return;
     let cancelled = false;
     const settle = (outcome: Result<T, PackageDetailsError>) => {
       if (!cancelled) setLoaded({ key, attempt, result: outcome });
@@ -48,13 +58,18 @@ export function useCheckedLoad<T>(
     return () => {
       cancelled = true;
     };
-  }, [load, reportId, name, key, attempt]);
+  }, [load, reportId, name, key, attempt, online, loaded]);
 
   if (key === null) return { status: "idle" };
   if (loaded?.key !== key || loaded.attempt !== attempt) {
-    return { status: "loading" };
+    return { status: online ? "loading" : "offline" };
   }
   return loaded.result.ok
     ? { status: "done", value: loaded.result.value }
-    : { status: "error", retry: () => setAttempt((count) => count + 1) };
+    : {
+        status: "error",
+        retry: () => {
+          if (isOnline()) setAttempt((count) => count + 1);
+        },
+      };
 }

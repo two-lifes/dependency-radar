@@ -2,11 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import { useId, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { SettingsSection } from "@/components/settings-section";
-import { Button } from "@/components/ui/button";
+import {
+  NetworkButton as Button,
+  NetworkError,
+} from "../system/network-status";
+import { isOnline } from "@/lib/use-online-status";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { DemoHint } from "../demo/demo-hint";
@@ -33,6 +37,7 @@ export function AccountSection({
   /** Every demo visitor would see the new name (plan.md 26.1). */
   demo?: boolean;
 }) {
+  const [failure, setFailure] = useState<string>();
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -53,6 +58,8 @@ export function AccountSection({
   const unchanged = typed.trim() === name;
 
   const onValid = ({ name: next }: FormValues) => {
+    if (!isOnline() || pending || demo) return;
+    setFailure(undefined);
     startTransition(async () => {
       try {
         const { error } = await updateName(next);
@@ -64,6 +71,7 @@ export function AccountSection({
         toast({ title: copy.saved });
       } catch (error) {
         console.error("[profile] couldn't save the name", error);
+        setFailure(copy.failed);
         toast({ title: copy.failed });
       }
     });
@@ -119,6 +127,10 @@ export function AccountSection({
             )}
           </Button>
         </div>
+        <NetworkError
+          message={failure}
+          disabled={pending || demo || unchanged}
+        />
       </form>
     </SettingsSection>
   );

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { toast } from "@/components/ui/toast";
+import { isOnline, useOnlineStatus } from "@/lib/use-online-status";
+import { networkCopy } from "../system/network-copy";
 import { queueCheck } from "./actions";
 import {
   initialQueue,
@@ -20,10 +21,13 @@ import {
 export function useCheckQueue(pendingProjectIds: string[]): {
   queue: QueueState;
   cooldowns: Record<string, string>;
+  failures: Record<string, string>;
   checkNow: (projectId: string) => void;
   forget: (projectId: string) => void;
 } {
   const router = useRouter();
+  const online = useOnlineStatus();
+  const [failures, setFailures] = useState<Record<string, string>>({});
   const [queue, dispatch] = useReducer(reduceQueue, initialQueue);
   const [cooldowns, setCooldowns] = useState<Record<string, string>>({});
   const sources = useRef(new Map<string, EventSource>());
@@ -44,7 +48,7 @@ export function useCheckQueue(pendingProjectIds: string[]): {
       sources.current.delete(projectId);
       dispatch({ type: "settled", projectId });
       // The card's score and date come from the server.
-      router.refresh();
+      if (isOnline()) router.refresh();
     },
     [router],
   );
@@ -74,6 +78,7 @@ export function useCheckQueue(pendingProjectIds: string[]): {
 
   const start = useCallback(
     async (item: QueueItem) => {
+      if (!isOnline()) return;
       inFlight.current.add(item.projectId);
       dispatch({ type: "starting", projectId: item.projectId });
       try {
@@ -104,7 +109,10 @@ export function useCheckQueue(pendingProjectIds: string[]): {
             });
             return;
           case "error":
-            toast({ title: result.message });
+            setFailures((previous) => ({
+              ...previous,
+              [item.projectId]: result.message,
+            }));
             settle(item.projectId);
             return;
           case "skipped":
@@ -114,7 +122,13 @@ export function useCheckQueue(pendingProjectIds: string[]): {
       } catch (error) {
         // A network or server failure: leave the card as the server shows it.
         console.error("[dashboard] couldn't start a check", error);
-        if (mounted.current) settle(item.projectId);
+        if (mounted.current) {
+          setFailures((previous) => ({
+            ...previous,
+            [item.projectId]: networkCopy.failed,
+          }));
+          settle(item.projectId);
+        }
       } finally {
         inFlight.current.delete(item.projectId);
       }
@@ -123,11 +137,12 @@ export function useCheckQueue(pendingProjectIds: string[]): {
   );
 
   useEffect(() => {
+    if (!online) return;
     for (const item of itemsToStart(queue)) {
       // StrictMode runs effects twice before the "starting" render lands.
       if (!inFlight.current.has(item.projectId)) void start(item);
     }
-  }, [queue, start]);
+  }, [queue, start, online]);
 
   const paused = queue.paused;
   useEffect(() => {
@@ -150,6 +165,12 @@ export function useCheckQueue(pendingProjectIds: string[]): {
   }, []);
 
   const checkNow = useCallback((projectId: string) => {
+    if (!isOnline()) return;
+    setFailures((previous) => {
+      const next = { ...previous };
+      delete next[projectId];
+      return next;
+    });
     dispatch({ type: "check-now", projectId });
   }, []);
 
@@ -160,7 +181,7 @@ export function useCheckQueue(pendingProjectIds: string[]): {
     dispatch({ type: "settled", projectId });
   }, []);
 
-  return { queue, cooldowns, checkNow, forget };
+  return { queue, cooldowns, failures, checkNow, forget };
 }
 
 // The payload comes from our own route handler; only its shape is guarded.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { isOnline } from "@/lib/use-online-status";
 import type { CheckEvent } from "@/server/check/events";
 import { reduceStream, type StreamState } from "./report-rows";
 
@@ -36,7 +37,8 @@ export function useCheckStream({
     let source: EventSource | undefined;
     // Opening on the next tick: StrictMode mounts effects twice, and closing
     // the first stream right away would cancel the check it just started.
-    const timer = setTimeout(() => {
+    const open = () => {
+      if (!isOnline() || source) return;
       source = new EventSource(`/api/checks/${checkId}/events`);
       sourceRef.current = source;
       const opened = source;
@@ -66,16 +68,20 @@ export function useCheckStream({
           }
         });
       }
-    }, 0);
+    };
+    const timer = setTimeout(open, 0);
+    window.addEventListener("online", open);
 
     return () => {
       clearTimeout(timer);
+      window.removeEventListener("online", open);
       source?.close();
       sourceRef.current = null;
     };
   }, [checkId, running, attempt]);
 
   const retry = useCallback(() => {
+    if (!isOnline()) return;
     dispatch({ type: "reconnect" });
     setAttempt((n) => n + 1);
   }, []);

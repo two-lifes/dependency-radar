@@ -43,13 +43,36 @@ describe("useCheckStream", () => {
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   const renderStream = (onDone = vi.fn(), running = true) =>
     renderHook(
       () => useCheckStream({ checkId: "c1", running, initial, onDone }),
       { wrapper: StrictMode },
     );
+
+  it("waits for connection before opening and preserves the existing stream across offline events", async () => {
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const { result } = renderStream();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(FakeEventSource.instances).toHaveLength(0);
+    act(() => result.current.retry());
+    expect(FakeEventSource.instances).toHaveLength(0);
+    online.mockReturnValue(true);
+    act(() => window.dispatchEvent(new Event("online")));
+    const source = await open();
+    source.send("progress", { checked: 1, total: 2 });
+    online.mockReturnValue(false);
+    act(() => window.dispatchEvent(new Event("offline")));
+    expect(source.closed).toBe(false);
+    expect(result.current.state.checked).toBe(1);
+    online.mockReturnValue(true);
+    act(() => window.dispatchEvent(new Event("online")));
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
 
   it("opens one stream even under StrictMode and applies events", async () => {
     const { result } = renderStream();

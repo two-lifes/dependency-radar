@@ -2,7 +2,11 @@
 
 import { Loader2 } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { NetworkButton } from "../system/network-status";
+import { useNetworkAction } from "../system/use-network-action";
+import { isOnline } from "@/lib/use-online-status";
+
+import { networkCopy } from "../system/network-copy";
 import { authCopy } from "./copy";
 import { initialSignInLinkState, type SignInLinkAction } from "./sign-in-state";
 
@@ -20,8 +24,9 @@ export function ResendLink({
   email: string;
   next: string;
 }) {
+  const network = useNetworkAction(action);
   const [state, formAction, pending] = useActionState(
-    action,
+    network.action,
     initialSignInLinkState,
   );
   // Every successful resend starts a new wait (a new key remounts the
@@ -33,11 +38,31 @@ export function ResendLink({
     : (state.error ?? (state.sent ? copy.resent : undefined));
 
   return (
-    <form action={formAction} className="grid justify-items-center gap-2">
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        if (
+          !isOnline() ||
+          pending ||
+          event.currentTarget.querySelector('button[type="submit"]:disabled')
+        )
+          event.preventDefault();
+      }}
+      className="grid justify-items-center gap-2"
+    >
       <input type="hidden" name="email" value={email} />
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="intent" value="resend" />
-      <CooldownButton key={sentAttempt} pending={pending} />
+      <CooldownButton
+        key={sentAttempt}
+        pending={pending}
+        failed={Boolean(network.error)}
+      />
+      {network.error ? (
+        <p role="alert" className="text-sm text-danger">
+          {network.error}
+        </p>
+      ) : null}
       {/* Polite: the countdown itself isn't announced every second. */}
       <p
         aria-live="polite"
@@ -51,7 +76,13 @@ export function ResendLink({
   );
 }
 
-function CooldownButton({ pending }: { pending: boolean }) {
+function CooldownButton({
+  pending,
+  failed,
+}: {
+  pending: boolean;
+  failed: boolean;
+}) {
   const [secondsLeft, setSecondsLeft] = useState(RESEND_COOLDOWN_SECONDS);
   const waiting = secondsLeft > 0;
 
@@ -64,7 +95,11 @@ function CooldownButton({ pending }: { pending: boolean }) {
   }, [waiting]);
 
   return (
-    <Button type="submit" variant="secondary" disabled={waiting || pending}>
+    <NetworkButton
+      type="submit"
+      variant="secondary"
+      disabled={waiting || pending}
+    >
       {pending ? (
         <>
           <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />
@@ -72,9 +107,11 @@ function CooldownButton({ pending }: { pending: boolean }) {
         </>
       ) : waiting ? (
         copy.resendIn(secondsLeft)
+      ) : failed ? (
+        networkCopy.retry
       ) : (
         copy.resend
       )}
-    </Button>
+    </NetworkButton>
   );
 }

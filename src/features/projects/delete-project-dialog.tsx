@@ -3,6 +3,9 @@
 import { Loader2 } from "lucide-react";
 import { type FormEvent, useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { NetworkButton } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { isOnline } from "@/lib/use-online-status";
 import {
   Dialog,
   DialogClose,
@@ -57,13 +60,15 @@ function DeleteForm({
   onDeleted: () => void;
 }) {
   const [typed, setTyped] = useState("");
+  const [failure, setFailure] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputId = useId();
   const matches = typed.trim() === project.name;
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!matches) return;
+    if (!isOnline() || pending || !matches) return;
+    setFailure(false);
     startTransition(async () => {
       try {
         const { ok } = await removeProject(project.id);
@@ -72,6 +77,7 @@ function DeleteForm({
         onDeleted();
       } catch (error) {
         console.error("[dashboard] couldn't delete a project", error);
+        setFailure(true);
         toast({ title: copy.failed });
       }
     });
@@ -96,13 +102,18 @@ function DeleteForm({
           disabled={pending}
         />
       </div>
+      {failure ? (
+        <p role="alert" className="text-sm text-danger">
+          {copy.failed}
+        </p>
+      ) : null}
       <DialogFooter>
         <DialogClose asChild>
           <Button variant="secondary" disabled={pending}>
             {copy.cancel}
           </Button>
         </DialogClose>
-        <Button
+        <NetworkButton
           type="submit"
           variant="destructive"
           className="bg-danger-soft"
@@ -113,10 +124,12 @@ function DeleteForm({
               <Loader2 className="motion-safe:animate-spin" aria-hidden />
               {copy.deleting}
             </>
+          ) : failure ? (
+            networkCopy.retry
           ) : (
             copy.confirm
           )}
-        </Button>
+        </NetworkButton>
       </DialogFooter>
     </form>
   );

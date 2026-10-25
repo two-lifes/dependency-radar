@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useOnlineStatus } from "@/lib/use-online-status";
+import { OfflineNotice } from "../system/network-status";
 import { checkAgain } from "./actions";
 import { CheckFailed } from "./check-status";
 import { checkFailureCopy } from "./copy";
@@ -13,12 +15,13 @@ import { ReportSummarySkeleton } from "./report-summary";
  * stays here with "Try again".
  */
 export function FirstCheckStarter({ reportId }: { reportId: string }) {
+  const online = useOnlineStatus();
   const [error, setError] = useState<string>();
   // StrictMode runs the effect twice; a second call would count twice.
   const started = useRef(false);
 
   useEffect(() => {
-    if (started.current) return;
+    if (started.current || !online) return;
     started.current = true;
     checkAgain(reportId).then(
       (result) => setError(result.error),
@@ -27,9 +30,10 @@ export function FirstCheckStarter({ reportId }: { reportId: string }) {
         setError(checkFailureCopy["internal-error"](null, new Date()));
       },
     );
-  }, [reportId]);
+  }, [reportId, online]);
 
-  if (error === undefined) return <ReportSummarySkeleton />;
+  if (error === undefined)
+    return online ? <ReportSummarySkeleton /> : <OfflineNotice />;
   return (
     <CheckFailed
       reason={error}

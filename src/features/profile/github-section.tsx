@@ -3,7 +3,9 @@
 import { Check, Loader2 } from "lucide-react";
 import { useId, useState } from "react";
 import { SettingsSection } from "@/components/settings-section";
-import { Button } from "@/components/ui/button";
+import { NetworkButton as Button } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { isOnline } from "@/lib/use-online-status";
 import { authClient } from "../auth/auth-client";
 import { DemoHint } from "../demo/demo-hint";
 import { profileCopy } from "./copy";
@@ -33,6 +35,7 @@ export function GithubSection({
   const hintId = useId();
 
   const connect = async () => {
+    if (!isOnline() || pending || demo) return;
     setPending(true);
     setFailed(false);
     // On success the browser leaves for GitHub, so pending stays on.
@@ -65,6 +68,15 @@ export function GithubSection({
             <p role="alert" className="text-sm text-danger">
               {copy.failed}
             </p>
+          ) : null}
+          {failed || linkFailed ? (
+            <Button
+              variant="secondary"
+              disabled={pending || demo}
+              onClick={() => void connect()}
+            >
+              {networkCopy.retry}
+            </Button>
           ) : null}
           <div className="grid justify-items-start gap-2">
             <Button

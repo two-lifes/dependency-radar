@@ -12,6 +12,11 @@ import {
 import { useForm, useWatch } from "react-hook-form";
 import { SettingsSection } from "@/components/settings-section";
 import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { useNetworkAction } from "../system/use-network-action";
+import { isOnline } from "@/lib/use-online-status";
+
 import {
   Dialog,
   DialogClose,
@@ -140,8 +145,9 @@ function ReplaceSourceForm({
   onCancel: () => void;
   nextCheckAt?: string | null;
 }) {
+  const network = useNetworkAction(replaceSource.bind(null, projectId));
   const [state, formAction, pending] = useActionState(
-    replaceSource.bind(null, projectId),
+    network.action,
     initialReplaceSourceState,
   );
   const cooldown = useCheckCooldown(
@@ -198,6 +204,7 @@ function ReplaceSourceForm({
   };
 
   const onValid = (form: SourceValues) => {
+    if (!isOnline() || pending || cooldown.seconds > 0) return;
     // Empty fields are caught here, so the confirmation never leads to an
     // error that was known before it.
     const empty = emptySource(form, upload);
@@ -215,7 +222,7 @@ function ReplaceSourceForm({
   };
 
   const confirm = () => {
-    if (!confirming || cooldown.seconds > 0) return;
+    if (!isOnline() || pending || !confirming || cooldown.seconds > 0) return;
     const formData = confirming;
     setConfirming(null);
     startTransition(() => formAction(formData));
@@ -276,7 +283,10 @@ function ReplaceSourceForm({
           >
             {copy.cancel}
           </Button>
-          <Button type="submit" disabled={pending || cooldown.seconds > 0}>
+          <NetworkButton
+            type="submit"
+            disabled={pending || cooldown.seconds > 0}
+          >
             {pending ? (
               <>
                 <Loader2 className="motion-safe:animate-spin" aria-hidden />
@@ -285,8 +295,22 @@ function ReplaceSourceForm({
             ) : (
               projectSettingsCopy.save
             )}
-          </Button>
+          </NetworkButton>
         </div>
+        {serverError ? (
+          <NetworkButton
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={pending || cooldown.seconds > 0}
+          >
+            {networkCopy.retry}
+          </NetworkButton>
+        ) : null}
+        <NetworkError
+          message={network.error}
+          disabled={pending || cooldown.seconds > 0}
+        />
       </form>
 
       {cooldown.seconds > 0 ? (
@@ -309,9 +333,9 @@ function ReplaceSourceForm({
             <DialogClose asChild>
               <Button variant="secondary">{copy.confirm.cancel}</Button>
             </DialogClose>
-            <Button onClick={confirm} disabled={cooldown.seconds > 0}>
+            <NetworkButton onClick={confirm} disabled={cooldown.seconds > 0}>
               {copy.confirm.confirm}
-            </Button>
+            </NetworkButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

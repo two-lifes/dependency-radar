@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useId, useState, useTransition } from "react";
 import { SettingsSection } from "@/components/settings-section";
 import { Button } from "@/components/ui/button";
+import { NetworkButton } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { isOnline } from "@/lib/use-online-status";
 import {
   Dialog,
   DialogClose,
@@ -71,7 +74,7 @@ function DeleteForm({ email }: { email: string }) {
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!matches) return;
+    if (!isOnline() || pending || !matches) return;
     setError(undefined);
     startTransition(async () => {
       try {
@@ -88,8 +91,17 @@ function DeleteForm({ email }: { email: string }) {
 
   // `/login` sends a signed-in user straight on, so sign out first.
   const signInAgain = async () => {
-    await authClient.signOut();
-    router.push(loginPath("/settings/profile"));
+    if (!isOnline()) return;
+    try {
+      const result = await authClient.signOut();
+      if (result.error) {
+        setError("failed");
+        return;
+      }
+      router.push(loginPath("/settings/profile"));
+    } catch {
+      setError("failed");
+    }
   };
 
   return (
@@ -117,13 +129,13 @@ function DeleteForm({ email }: { email: string }) {
             {error === "reauth" ? (
               <>
                 {copy.reauth}{" "}
-                <button
+                <NetworkButton
                   type="button"
                   onClick={() => void signInAgain()}
                   className="rounded-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {copy.signInAgain}
-                </button>
+                </NetworkButton>
               </>
             ) : (
               copy.failed
@@ -137,7 +149,7 @@ function DeleteForm({ email }: { email: string }) {
             {copy.cancel}
           </Button>
         </DialogClose>
-        <Button
+        <NetworkButton
           type="submit"
           variant="destructive"
           className="bg-danger-soft"
@@ -148,10 +160,12 @@ function DeleteForm({ email }: { email: string }) {
               <Loader2 className="motion-safe:animate-spin" aria-hidden />
               {copy.deleting}
             </>
+          ) : error === "failed" ? (
+            networkCopy.retry
           ) : (
             copy.confirm
           )}
-        </Button>
+        </NetworkButton>
       </DialogFooter>
     </form>
   );

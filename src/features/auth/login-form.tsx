@@ -3,7 +3,11 @@
 import { Loader2 } from "lucide-react";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
+import { useNetworkAction } from "../system/use-network-action";
+import { networkCopy } from "../system/network-copy";
+import { isOnline } from "@/lib/use-online-status";
+
 import { Input } from "@/components/ui/input";
 import { authClient } from "./auth-client";
 import { authCopy } from "./copy";
@@ -39,8 +43,9 @@ export function LoginForm({
    */
   emailEnabled?: boolean;
 }) {
+  const network = useNetworkAction(action);
   const [state, formAction, pending] = useActionState(
-    action,
+    network.action,
     initialSignInLinkState,
   );
   const [githubPending, setGithubPending] = useState(false);
@@ -66,6 +71,7 @@ export function LoginForm({
   }, [state]);
 
   const signInWithGithub = async () => {
+    if (!isOnline() || busy) return;
     setGithubPending(true);
     setGithubFailed(false);
     // On success the browser leaves for GitHub, so pending stays on.
@@ -100,7 +106,16 @@ export function LoginForm({
         </p>
       ) : null}
 
-      <Button
+      {githubFailed || error === "github" ? (
+        <NetworkButton
+          variant="secondary"
+          disabled={busy}
+          onClick={() => void signInWithGithub()}
+        >
+          {networkCopy.retry}
+        </NetworkButton>
+      ) : null}
+      <NetworkButton
         type="button"
         variant="secondary"
         size="lg"
@@ -115,7 +130,7 @@ export function LoginForm({
         ) : (
           copy.github
         )}
-      </Button>
+      </NetworkButton>
 
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
@@ -124,7 +139,13 @@ export function LoginForm({
       </div>
 
       {/* noValidate: the server answers with the screens 5.2 message. */}
-      <form action={formAction} noValidate>
+      <form
+        action={formAction}
+        onSubmit={(event) => {
+          if (!isOnline() || busy || !emailEnabled) event.preventDefault();
+        }}
+        noValidate
+      >
         {/* A disabled fieldset disables the field and the submit button. */}
         <fieldset disabled={!emailEnabled} className="grid min-w-0 gap-4">
           <input type="hidden" name="next" value={next} />
@@ -159,7 +180,17 @@ export function LoginForm({
               </p>
             ) : null}
           </div>
-          <Button type="submit" size="lg" disabled={busy}>
+          {fieldError ? (
+            <NetworkButton
+              type="submit"
+              variant="ghost"
+              size="sm"
+              disabled={busy || !emailEnabled}
+            >
+              {networkCopy.retry}
+            </NetworkButton>
+          ) : null}
+          <NetworkButton type="submit" size="lg" disabled={busy}>
             {pending ? (
               <>
                 <Loader2
@@ -171,8 +202,9 @@ export function LoginForm({
             ) : (
               copy.submit
             )}
-          </Button>
+          </NetworkButton>
         </fieldset>
+        <NetworkError message={network.error} disabled={pending} />
       </form>
 
       <p id={hintId} className="text-center text-sm text-muted-foreground">

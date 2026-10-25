@@ -5,7 +5,7 @@ import type { ElementType, HTMLAttributes } from "react";
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { NetworkButton, OfflineNotice } from "../system/network-status";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -30,6 +30,8 @@ export function ReleaseNotes({ state }: { state: ReleaseNotesState }) {
   switch (state.status) {
     case "idle":
       return null;
+    case "offline":
+      return <OfflineNotice />;
     case "loading":
       return (
         <div
@@ -48,10 +50,10 @@ export function ReleaseNotes({ state }: { state: ReleaseNotesState }) {
           <p className="text-sm text-muted-foreground">
             {copy.releaseNotesFailed}
           </p>
-          <Button variant="secondary" size="sm" onClick={state.retry}>
+          <NetworkButton variant="secondary" size="sm" onClick={state.retry}>
             <RotateCw aria-hidden />
             {copy.retry}
-          </Button>
+          </NetworkButton>
         </div>
       );
     case "done": {

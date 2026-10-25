@@ -3,7 +3,7 @@
 import { RotateCw, TriangleAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ErrorInfo } from "next/error";
-import { Button } from "@/components/ui/button";
+import { NetworkButton as Button } from "@/features/system/network-status";
 import { projectSettingsCopy as copy } from "@/features/project-settings/copy";
 import { ProjectSettingsLayout } from "@/features/project-settings/settings-layout";
 import { EmptyState } from "@/features/report/empty-state";

@@ -14,6 +14,11 @@ import {
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { useNetworkAction } from "../system/use-network-action";
+import { isOnline } from "@/lib/use-online-status";
+
 import {
   Dialog,
   DialogContent,
@@ -64,8 +69,9 @@ export function NewProjectForm({
   initialSource?: CheckSource;
   githubConnected?: boolean;
 }) {
+  const network = useNetworkAction(createProject);
   const [state, formAction, pending] = useActionState(
-    createProject,
+    network.action,
     initialNewProjectState,
   );
   const {
@@ -176,6 +182,7 @@ export function NewProjectForm({
   };
 
   const onValid = (form: FormValues) => {
+    if (!isOnline() || pending) return;
     const noManifest =
       form.source === "upload" ? missingManifest(upload) : undefined;
     if (noManifest) {
@@ -289,7 +296,7 @@ export function NewProjectForm({
           <Button asChild variant="secondary">
             <Link href="/projects">{copy.cancel}</Link>
           </Button>
-          <Button type="submit" disabled={pending}>
+          <NetworkButton type="submit" disabled={pending}>
             {pending ? (
               <>
                 <Loader2 className="motion-safe:animate-spin" aria-hidden />
@@ -298,8 +305,19 @@ export function NewProjectForm({
             ) : (
               copy.submit
             )}
-          </Button>
+          </NetworkButton>
         </div>
+        {serverError ? (
+          <NetworkButton
+            type="submit"
+            variant="secondary"
+            size="sm"
+            disabled={pending}
+          >
+            {networkCopy.retry}
+          </NetworkButton>
+        ) : null}
+        <NetworkError message={network.error} disabled={pending} />
       </form>
 
       <Dialog

@@ -19,6 +19,7 @@ import {
 } from "react";
 import { PackageStatusBadge, SeverityBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
+import { NetworkButton, OfflineNotice } from "../system/network-status";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -285,6 +286,8 @@ function About({ details }: { details: DetailsState }) {
   switch (details.status) {
     case "idle":
       return null;
+    case "offline":
+      return <OfflineNotice />;
     case "loading":
       return (
         <div aria-busy="true" aria-label={copy.loading} className="grid gap-2">
@@ -297,10 +300,10 @@ function About({ details }: { details: DetailsState }) {
       return (
         <div role="alert" className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-muted-foreground">{copy.detailsFailed}</p>
-          <Button variant="secondary" size="sm" onClick={details.retry}>
+          <NetworkButton variant="secondary" size="sm" onClick={details.retry}>
             <RotateCw aria-hidden />
             {copy.retry}
-          </Button>
+          </NetworkButton>
         </div>
       );
     case "done":

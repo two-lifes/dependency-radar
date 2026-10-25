@@ -4,7 +4,8 @@ import { RotateCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { NetworkButton, OfflineNotice } from "../system/network-status";
+import { isOnline, useOnlineStatus } from "@/lib/use-online-status";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
@@ -21,6 +22,7 @@ const SKELETON_ROWS = 5;
 
 export type GithubReposState =
   | { status: "idle" }
+  | { status: "offline" }
   | { status: "loading" }
   | { status: "error"; error: SourceError; retry: () => void }
   | { status: "done"; value: GithubRepoList };
@@ -30,6 +32,7 @@ export type GithubReposState =
  * switching tabs (which unmounts the panel) doesn't reload it.
  */
 export function useGithubRepos(enabled: boolean): GithubReposState {
+  const online = useOnlineStatus();
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{
     attempt: number;
@@ -40,7 +43,7 @@ export function useGithubRepos(enabled: boolean): GithubReposState {
   if (enabled && !started) setStarted(true);
 
   useEffect(() => {
-    if (!started) return;
+    if (!started || !online || loaded?.attempt === attempt) return;
     let cancelled = false;
     const settle = (result: Result<GithubRepoList, SourceError>) => {
       if (!cancelled) setLoaded({ attempt, result });
@@ -52,16 +55,19 @@ export function useGithubRepos(enabled: boolean): GithubReposState {
     return () => {
       cancelled = true;
     };
-  }, [started, attempt]);
+  }, [started, attempt, online, loaded]);
 
   if (!started) return { status: "idle" };
-  if (loaded?.attempt !== attempt) return { status: "loading" };
+  if (loaded?.attempt !== attempt)
+    return { status: online ? "loading" : "offline" };
   return loaded.result.ok
     ? { status: "done", value: loaded.result.value }
     : {
         status: "error",
         error: loaded.result.error,
-        retry: () => setAttempt((count) => count + 1),
+        retry: () => {
+          if (isOnline()) setAttempt((count) => count + 1);
+        },
       };
 }
 
@@ -96,6 +102,8 @@ export function GithubRepoList({
   switch (state.status) {
     case "idle":
       return null;
+    case "offline":
+      return <OfflineNotice />;
     case "loading":
       return (
         <section className="grid gap-2">
@@ -121,10 +129,14 @@ export function GithubRepoList({
           ) : (
             <>
               <p className="text-sm text-muted-foreground">{copy.failed}</p>
-              <Button variant="secondary" size="sm" onClick={state.retry}>
+              <NetworkButton
+                variant="secondary"
+                size="sm"
+                onClick={state.retry}
+              >
                 <RotateCw aria-hidden />
                 {copy.retry}
-              </Button>
+              </NetworkButton>
             </>
           )}
         </div>

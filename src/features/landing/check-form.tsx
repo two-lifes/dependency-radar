@@ -10,7 +10,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { useNetworkAction } from "../system/use-network-action";
+import { isOnline } from "@/lib/use-online-status";
+
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,8 +37,9 @@ const copy = landingCopy.form;
 
 /** screens 5.1, block 3: the main element of the landing. */
 export function CheckForm({ action }: { action: CheckFormAction }) {
+  const network = useNetworkAction(action);
   const [state, formAction, pending] = useActionState(
-    action,
+    network.action,
     initialCheckFormState,
   );
   const [source, setSource] = useState<CheckSource>("paste");
@@ -100,7 +105,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
   // is a Blob in state, and a form field can't carry it.
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (quota.blocked || exhausted || pending) return;
+    if (!isOnline() || quota.blocked || exhausted || pending) return;
     if (source === "upload" && !upload.manifest) {
       setLocalError(
         upload.lockfile
@@ -211,12 +216,22 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
         </p>
       ) : null}
 
+      {serverError ? (
+        <NetworkButton
+          type="submit"
+          variant="ghost"
+          size="sm"
+          disabled={pending || quota.blocked || exhausted}
+        >
+          {networkCopy.retry}
+        </NetworkButton>
+      ) : null}
       <div className="grid justify-items-center gap-2">
         <GuestQuotaNotice exhausted={exhausted} />
         {exhausted ? (
           <GuestGithubButton />
         ) : (
-          <Button
+          <NetworkButton
             type="submit"
             size="lg"
             className="w-full"
@@ -233,7 +248,7 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
             ) : (
               copy.submit
             )}
-          </Button>
+          </NetworkButton>
         )}
         <button
           type="button"
@@ -248,6 +263,10 @@ export function CheckForm({ action }: { action: CheckFormAction }) {
           {copy.sample}
         </button>
       </div>
+      <NetworkError
+        message={network.error}
+        disabled={pending || quota.blocked || exhausted}
+      />
     </form>
   );
 }

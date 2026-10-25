@@ -7,6 +7,7 @@ import { ThemeScriptFallback } from "@/components/theme-script-fallback";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { themeScript } from "@/lib/theme";
+import { OfflineBanner } from "@/features/system/network-status";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <ThemeScriptFallback />
+        <OfflineBanner />
         <NuqsAdapter>
           <TooltipProvider>
             {children}

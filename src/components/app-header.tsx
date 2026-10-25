@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/features/auth/auth-client";
+import { isOnline, useOnlineStatus } from "@/lib/use-online-status";
+import { NetworkError } from "@/features/system/network-status";
+import { networkCopy } from "@/features/system/network-copy";
 import { authCopy } from "@/features/auth/copy";
 import {
   readThemePreference,
@@ -36,13 +39,25 @@ const themes: ThemePreference[] = ["light", "dark", "system"];
 /** screens 4.2: every page after sign-in. */
 export function AppHeader({ user }: { user: HeaderUser }) {
   const router = useRouter();
+  const online = useOnlineStatus();
+  const [failure, setFailure] = useState<string>();
   // Read when the menu opens: storage isn't available during the server render.
   const [theme, setTheme] = useState<ThemePreference>("system");
 
   const signOut = async () => {
-    await authClient.signOut();
-    router.push("/");
-    router.refresh();
+    if (!isOnline()) return;
+    setFailure(undefined);
+    try {
+      const result = await authClient.signOut();
+      if (result?.error) {
+        setFailure(networkCopy.failed);
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch {
+      setFailure(networkCopy.failed);
+    }
   };
 
   return (
@@ -106,12 +121,18 @@ export function AppHeader({ user }: { user: HeaderUser }) {
               ))}
             </DropdownMenuRadioGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void signOut()}>
+            <DropdownMenuItem
+              disabled={!online}
+              title={!online ? networkCopy.required : undefined}
+              aria-description={!online ? networkCopy.required : undefined}
+              onSelect={() => void signOut()}
+            >
               {copy.signOut}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <NetworkError message={failure} onRetry={() => void signOut()} />
     </header>
   );
 }

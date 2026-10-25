@@ -2,11 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import { useId, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { SettingsSection } from "@/components/settings-section";
-import { Button } from "@/components/ui/button";
+import {
+  NetworkButton as Button,
+  NetworkError,
+} from "../system/network-status";
+import { isOnline } from "@/lib/use-online-status";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { DemoHint } from "../demo/demo-hint";
@@ -36,6 +40,7 @@ export function GeneralSection({
   /** A seeded demo project is shared by every visitor (plan.md 26.1). */
   demo?: boolean;
 }) {
+  const [failure, setFailure] = useState<string>();
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -55,6 +60,8 @@ export function GeneralSection({
   const unchanged = typed.trim() === name;
 
   const onValid = ({ name: next }: FormValues) => {
+    if (!isOnline() || pending || demo) return;
+    setFailure(undefined);
     startTransition(async () => {
       try {
         const { error } = await renameProject(projectId, next);
@@ -66,6 +73,7 @@ export function GeneralSection({
         toast({ title: copy.general.saved });
       } catch (error) {
         console.error("[settings] couldn't rename a project", error);
+        setFailure(copy.general.failed);
         toast({ title: copy.general.failed });
       }
     });
@@ -110,6 +118,10 @@ export function GeneralSection({
             )}
           </Button>
         </div>
+        <NetworkError
+          message={failure}
+          disabled={pending || demo || unchanged}
+        />
       </form>
     </SettingsSection>
   );

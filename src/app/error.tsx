@@ -3,6 +3,7 @@
 import { TriangleAlertIcon } from "lucide-react";
 import type { ErrorInfo } from "next/error";
 import Link from "next/link";
+import { NetworkButton } from "@/features/system/network-status";
 import { Button } from "@/components/ui/button";
 import { systemCopy } from "@/features/system/copy";
 import { SystemMessage } from "@/features/system/system-message";
@@ -16,7 +17,7 @@ export default function ErrorPage({ retry }: Pick<ErrorInfo, "retry">) {
       icon={<TriangleAlertIcon aria-hidden="true" />}
       title={copy.title}
     >
-      <Button onClick={retry}>{copy.tryAgain}</Button>
+      <NetworkButton onClick={retry}>{copy.tryAgain}</NetworkButton>
       <Button asChild variant="secondary">
         <Link href="/">{copy.goHome}</Link>
       </Button>

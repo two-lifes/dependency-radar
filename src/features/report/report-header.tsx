@@ -10,8 +10,11 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { NetworkButton, NetworkError } from "../system/network-status";
+import { networkCopy } from "../system/network-copy";
+import { isOnline, useOnlineStatus } from "@/lib/use-online-status";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,12 +71,14 @@ export function ReportHeader({
   warnings: string[];
 }) {
   const { running } = useReport();
-  const [pending, run] = useReportAction();
+  const [pending, run, failure] = useReportAction();
+  const online = useOnlineStatus();
+  const [saveFailure, setSaveFailure] = useState<string>();
   const quota = useGuestQuota();
   const cooldown = useCheckCooldown(nextCheckAt);
   const exhausted = quota.state.kind === "guest" && quota.state.remaining === 0;
   const checkDisabled =
-    running || pending || quota.blocked || cooldown.seconds > 0;
+    !online || running || pending || quota.blocked || cooldown.seconds > 0;
   const checkLabel =
     pending && source.kind === "github"
       ? copy.actions.fetchingRepository
@@ -83,7 +88,17 @@ export function ReportHeader({
 
   const [saving, startSaving] = useTransition();
   // saveReport ends in a redirect to the project.
-  const onSave = () => startSaving(() => saveReport(reportId));
+  const onSave = () => {
+    if (!isOnline() || saving) return;
+    setSaveFailure(undefined);
+    startSaving(async () => {
+      try {
+        await saveReport(reportId);
+      } catch {
+        setSaveFailure(networkCopy.failed);
+      }
+    });
+  };
 
   const onCheckAgain = () =>
     run(async () => {
@@ -135,25 +150,25 @@ export function ReportHeader({
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {mode.kind === "project" ? (
-            <Button disabled={checkDisabled} onClick={onCheckAgain}>
+            <NetworkButton disabled={checkDisabled} onClick={onCheckAgain}>
               {pending ? (
                 <Loader2 className="animate-spin" aria-hidden />
               ) : (
                 <RefreshCw aria-hidden />
               )}
               {checkLabel}
-            </Button>
+            </NetworkButton>
           ) : mode.signedIn ? (
-            <Button disabled={saving} onClick={onSave}>
+            <NetworkButton disabled={saving} onClick={onSave}>
               {saving ? <Loader2 className="animate-spin" aria-hidden /> : null}
               {saving ? copy.actions.saving : copy.actions.save}
-            </Button>
+            </NetworkButton>
           ) : (
-            <Button asChild>
+            <NetworkButton asChild>
               <Link href={`/login?next=/r/${reportId}/save`}>
                 {copy.actions.save}
               </Link>
-            </Button>
+            </NetworkButton>
           )}
           <Button
             variant="secondary"
@@ -177,7 +192,7 @@ export function ReportHeader({
           ) : exhausted ? (
             <GuestGithubButton />
           ) : (
-            <Button
+            <NetworkButton
               variant="secondary"
               className="max-md:hidden"
               disabled={checkDisabled}
@@ -189,7 +204,7 @@ export function ReportHeader({
                 <RefreshCw aria-hidden />
               )}
               {checkLabel}
-            </Button>
+            </NetworkButton>
           )}
           {/* < 768px secondary actions move into a menu (screens 5.4). */}
           <DropdownMenu>
@@ -218,6 +233,8 @@ export function ReportHeader({
               ) : exhausted ? null : (
                 <DropdownMenuItem
                   disabled={checkDisabled}
+                  title={!online ? networkCopy.required : undefined}
+                  aria-description={!online ? networkCopy.required : undefined}
                   onSelect={onCheckAgain}
                 >
                   <RefreshCw aria-hidden />
@@ -234,6 +251,12 @@ export function ReportHeader({
         </div>
       </div>
 
+      <NetworkError
+        message={failure}
+        onRetry={onCheckAgain}
+        disabled={checkDisabled}
+      />
+      <NetworkError message={saveFailure} onRetry={onSave} disabled={saving} />
       {expiresAt ? (
         <p className="text-sm text-muted-foreground" suppressHydrationWarning>
           {copy.expiresOn(formatDayMonth(new Date(expiresAt)))}
