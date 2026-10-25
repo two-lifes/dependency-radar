@@ -65,7 +65,20 @@ pnpm db:migrate   # apply migrations
 pnpm db:seed      # demo data
 ```
 
-Before declaring a task done, run: `pnpm lint && pnpm typecheck && pnpm test`.
+## Verification cadence and development speed
+
+A **task** is one numbered item in `docs/plan.md`. A **development stage** is one lettered section **A–F** of that plan, not a product version from spec section 11.
+
+- **After a task:** inspect the diff, run ESLint only on changed code files (`pnpm exec eslint <files>`) and run only the relevant new/affected unit or RTL test files (`pnpm exec vitest run <test-files>`). Run `pnpm typecheck` once when TypeScript code or interfaces change. For documentation-only changes, check the diff, links and consistency; do not run application checks.
+- **Heavy checks are prohibited after individual tasks.** Full-project lint/test runs, production builds, PostgreSQL integration tests, Playwright/e2e, browser screenshot matrices, performance measurements and real external API checks are reserved for stage completion or a direct user request for those checks. A UI change, a large diff, a commit or a push is not permission to run them.
+- **At stage completion:** after implementing the last unfinished task in its A–F section, run `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build` once, plus the integration/e2e and visual checks relevant to that stage. For UI stages, use Playwright MCP and compare affected screens with `docs/screens.md` and `docs/wireframes.png` in dark/light themes at 1440px/390px; include any additional viewport required by the stage. Do not re-audit unrelated screens.
+- Write necessary integration/e2e tests alongside the feature, but defer their execution to the stage gate. Record pending checks or unavailable prerequisites briefly in the corresponding stage of `docs/plan.md`; report them as deferred, never as passed. Deferral does not mean deleting, skipping or weakening tests.
+- Do not create databases/containers, install browsers or dependencies, start auxiliary services, or repair the test environment just to finish an individual task. If a necessary focused check cannot run, report the exact blocker; do not silently expand into environment setup or heavy verification. Existing approval requirements for migrations and destructive actions still apply at stage gates.
+- Read only task-relevant documentation and code. Reuse findings and documentation already verified in the session. Keep the diff within the approved task; report unrelated issues without fixing them.
+- Stop after the necessary focused checks pass. Repeat a check only after a relevant code change or to verify a concrete fix to its failure. Do not repeat successful checks for a final summary, documentation edits, a commit or a push. Reuse applicable CI results instead of duplicating them locally; CI configuration is unchanged.
+- Use the existing tools and test setup. If a short validation turns into infrastructure work, stop that detour and state what remains unverified. No speculative audits, extra screenshots or additional coverage unrelated to the task's acceptance criteria.
+
+This cadence replaces earlier per-task full-suite and per-UI screenshot requirements, including historical instructions in task descriptions. `docs/workflow.md` and the `next-task` skill follow this section.
 
 ## Code conventions
 
@@ -77,7 +90,7 @@ Before declaring a task done, run: `pnpm lint && pnpm typecheck && pnpm test`.
 - Accessibility: semantic HTML, keyboard support, visible focus, labels for inputs, `prefers-reduced-motion`
 - UI text in English, kept in one place per feature so it can be translated later
 - Secrets only in env variables; `.env.example` lists every variable with no values
-- `notFound()` before streaming (real 404) makes Next send an error shell (`<html id="__next_error__">`) and render the root layout on the client, so inline `<head>` scripts don't run. Anything the theme script does must also be covered by `ThemeScriptFallback`; check 404s in both themes
+- `notFound()` before streaming (real 404) makes Next send an error shell (`<html id="__next_error__">`) and render the root layout on the client, so inline `<head>` scripts don't run. Anything the theme script does must also be covered by `ThemeScriptFallback`; include 404s in the stage's theme checks when theme/error-shell behavior changes.
 
 ## How to work in this repo
 
@@ -88,4 +101,4 @@ Before declaring a task done, run: `pnpm lint && pnpm typecheck && pnpm test`.
 5. New logic comes with tests. Bug fixes come with a test reproducing the bug.
 6. When making an architectural choice (library, data model, caching, approach), add an entry to `docs/decisions.md`: context, options, choice, why.
 7. Explain non-obvious code in the summary after each task so the author can review and defend it.
-8. After any UI change, open the page with Playwright MCP, take screenshots in dark and light themes at 1440px and 390px, compare against `docs/screens.md` and `docs/wireframes.png`, and fix mismatches before finishing.
+8. Follow the verification cadence above. Implement UI against the relevant screen requirements during the task; run the browser and screenshot review only at its A–F stage gate or when directly requested.
